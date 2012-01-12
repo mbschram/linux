@@ -2441,8 +2441,13 @@ static int __init eni_init(void)
 	return pci_register_driver(&eni_driver);
 }
 
+static void __exit eni_exit(void)
+{
+	pci_unregister_driver(&eni_driver);
+}
 
 module_init(eni_init);
+module_exit(eni_exit);
 /* @@@ since exit routine not defined, this module can not be unloaded */
 
 MODULE_LICENSE("GPL");
