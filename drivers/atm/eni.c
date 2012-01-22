@@ -1960,7 +1960,6 @@ out:
 	return error;
 }
 
-
 static void eni_close(struct atm_vcc *vcc)
 {
 	DPRINTK(">eni_close\n");
