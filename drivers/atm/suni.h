@@ -1,7 +1,7 @@
 /*
  * drivers/atm/suni.h - S/UNI PHY driver
  */
- 
+
 /* Written 1995-2000 by Werner Almesberger, EPFL LRC/ICA */
 
 #ifndef DRIVER_ATM_SUNI_H
@@ -36,7 +36,7 @@
 #define SUNI_RLOP_LB		0x1B	/* RLOP Line BIP-8/24 */
 #define SUNI_RLOP_LBM		0x1C	/* RLOP Line BIP-8/24 MSB */
 #define SUNI_RLOP_LFL		0x1D	/* RLOP Line FEBE LSB */
-#define SUNI_RLOP_LF 		0x1E	/* RLOP Line FEBE */
+#define SUNI_RLOP_LF		0x1E	/* RLOP Line FEBE */
 #define SUNI_RLOP_LFM		0x1F	/* RLOP Line FEBE MSB */
 #define SUNI_TLOP_CTRL		0x20	/* TLOP Control */
 #define SUNI_TLOP_DIAG		0x21	/* TLOP Diagnostic */
@@ -95,9 +95,9 @@
 
 /* MRI is reg 0 */
 #define SUNI_MRI_ID		0x0f	/* R, SUNI revision number */
-#define SUNI_MRI_ID_SHIFT 	0
+#define SUNI_MRI_ID_SHIFT	0
 #define SUNI_MRI_TYPE		0x70	/* R, SUNI type (lite is 011) */
-#define SUNI_MRI_TYPE_SHIFT 	4
+#define SUNI_MRI_TYPE_SHIFT	4
 #define SUNI_MRI_TYPE_PM5346	0x3	/* S/UNI 155 LITE */
 #define SUNI_MRI_TYPE_PM5347	0x4	/* S/UNI 155 PLUS */
 #define SUNI_MRI_TYPE_PM5350	0x7	/* S/UNI 155 ULTRA */
