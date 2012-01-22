@@ -2382,7 +2382,7 @@ static int eni_init_one(struct pci_dev *pci_dev,
 
 	eni_dev->more = eni_boards;
 	eni_boards = dev;
-out:
+
 	return rc;
 
 err_eni_release:
@@ -2395,7 +2395,8 @@ err_kfree:
 	kfree(eni_dev);
 err_disable:
 	pci_disable_device(pci_dev);
-	goto out;
+out:
+	return rc;
 }
 
 
