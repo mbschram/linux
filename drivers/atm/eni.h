@@ -1,8 +1,8 @@
 /* drivers/atm/eni.h - Efficient Networks ENI155P device driver declarations */
- 
+
 /* Written 1995-2000 by Werner Almesberger, EPFL LRC/ICA */
- 
- 
+
+
 #ifndef DRIVER_ATM_ENI_H
 #define DRIVER_ATM_ENI_H
 
@@ -94,8 +94,8 @@ struct eni_dev {
 	int tx_mult;			/* buffer size multiplier (percent) */
 	/*-------------------------------- RX part */
 	u32 serv_read;			/* host service read index */
-	struct atm_vcc *fast,*last_fast;/* queues of VCCs with pending PDUs */
-	struct atm_vcc *slow,*last_slow;
+	struct atm_vcc *fast, *last_fast;/* queues of VCCs with pending PDUs */
+	struct atm_vcc *slow, *last_slow;
 	struct atm_vcc **rx_map;	/* for fast lookups */
 	struct sk_buff_head rx_queue;	/* PDUs currently being RX-DMAed */
 	wait_queue_head_t rx_wait;	/* for close */
