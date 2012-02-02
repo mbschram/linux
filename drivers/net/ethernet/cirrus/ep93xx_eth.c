@@ -546,10 +546,8 @@ err:
 	return 1;
 }
 
-static int ep93xx_start_hw(struct net_device *dev)
+static int ep93xx_reset_hw(struct ep93xx_priv *ep)
 {
-	struct ep93xx_priv *ep = netdev_priv(dev);
-	unsigned long addr;
 	int i;
 
 	wrl(ep, REG_SELFCTL, REG_SELFCTL_RESET);
@@ -563,6 +561,20 @@ static int ep93xx_start_hw(struct net_device *dev)
 		pr_crit("hw failed to reset\n");
 		return 1;
 	}
+
+	return 0;
+}
+
+static int ep93xx_start_hw(struct net_device *dev)
+{
+	struct ep93xx_priv *ep = netdev_priv(dev);
+	unsigned long addr;
+	int i;
+	int ret;
+
+	ret = ep93xx_reset_hw(ep);
+	if (ret)
+		return ret;
 
 	wrl(ep, REG_SELFCTL, ((ep->mdc_divisor - 1) << 9));
 
@@ -631,17 +643,8 @@ static int ep93xx_start_hw(struct net_device *dev)
 static void ep93xx_stop_hw(struct net_device *dev)
 {
 	struct ep93xx_priv *ep = netdev_priv(dev);
-	int i;
 
-	wrl(ep, REG_SELFCTL, REG_SELFCTL_RESET);
-	for (i = 0; i < 10; i++) {
-		if ((rdl(ep, REG_SELFCTL) & REG_SELFCTL_RESET) == 0)
-			break;
-		msleep(1);
-	}
-
-	if (i == 10)
-		pr_crit("hw failed to reset\n");
+	ep93xx_reset_hw(ep);
 }
 
 static int ep93xx_open(struct net_device *dev)
