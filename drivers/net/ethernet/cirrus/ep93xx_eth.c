@@ -41,6 +41,8 @@
 #define  REG_RXCTL_DEFAULT	0x00073800
 #define REG_TXCTL		0x0004
 #define  REG_TXCTL_ENABLE	0x00000001
+#define REG_TESTCTL		0x0008
+#define  REG_TESTCTL_MFDX	0x00000040
 #define REG_MIICMD		0x0010
 #define  REG_MIICMD_READ	0x00008000
 #define  REG_MIICMD_WRITE	0x00004000
@@ -256,6 +258,7 @@ static void ep93xx_adjust_link(struct net_device *dev)
 	struct ep93xx_priv * ep = netdev_priv(dev);
 	struct phy_device *phydev = ep->phydev;
 	int status_changed = 0;
+	u32 reg;
 
 	BUG_ON(!phydev);
 
@@ -267,6 +270,13 @@ static void ep93xx_adjust_link(struct net_device *dev)
 	if (phydev->link && (ep->old_duplex != phydev->duplex)) {
 		status_changed = 1;
 		ep->old_duplex = phydev->duplex;
+
+		reg = rdl(ep, REG_TESTCTL);
+		if (phydev->duplex == DUPLEX_FULL)
+			reg |= REG_TESTCTL_MFDX;
+		else
+			reg &= ~REG_TESTCTL_MFDX;
+		wrl(ep, REG_TESTCTL, reg);
 	}
 
 	if (status_changed) {
