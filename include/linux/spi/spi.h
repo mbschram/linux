@@ -168,6 +168,7 @@ struct spi_device {
 
 	/* the statistics */
 	struct spi_statistics	statistics;
+	struct list_head	detected;
 
 	/*
 	 * likely need more hooks for more protocol options affecting how
@@ -400,6 +401,7 @@ struct spi_master {
 	struct device	dev;
 
 	struct list_head list;
+	struct list_head userspace_devices;
 
 	/* other than negative (== assign one dynamically), bus_num is fully
 	 * board-specific.  usually that simplifies to being SOC-specific.
