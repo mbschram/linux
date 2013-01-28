@@ -61,6 +61,7 @@ static void bcm63xx_ehci_power_off(struct platform_device *pdev)
 static struct usb_ehci_pdata bcm63xx_ehci_pdata = {
 	.big_endian_desc	= 1,
 	.big_endian_mmio	= 1,
+	.ignore_oc		= 1,
 	.power_on		= bcm63xx_ehci_power_on,
 	.power_off		= bcm63xx_ehci_power_off,
 	.power_suspend		= bcm63xx_ehci_power_off,
