@@ -41,6 +41,7 @@
 #include <bcm63xx_dev_usb_usbd.h>
 #include <bcm63xx_io.h>
 #include <bcm63xx_regs.h>
+#include <bcm63xx_usb_priv.h>
 
 #define DRV_MODULE_NAME		"bcm63xx_udc"
 
@@ -864,22 +865,7 @@ static void bcm63xx_select_phy_mode(struct bcm63xx_udc *udc, bool is_device)
 		bcm_gpio_writel(val, GPIO_PINMUX_OTHR_REG);
 	}
 
-	val = bcm_rset_readl(RSET_USBH_PRIV, USBH_PRIV_UTMI_CTL_6368_REG);
-	if (is_device) {
-		val |= (portmask << USBH_PRIV_UTMI_CTL_HOSTB_SHIFT);
-		val |= (portmask << USBH_PRIV_UTMI_CTL_NODRIV_SHIFT);
-	} else {
-		val &= ~(portmask << USBH_PRIV_UTMI_CTL_HOSTB_SHIFT);
-		val &= ~(portmask << USBH_PRIV_UTMI_CTL_NODRIV_SHIFT);
-	}
-	bcm_rset_writel(RSET_USBH_PRIV, val, USBH_PRIV_UTMI_CTL_6368_REG);
-
-	val = bcm_rset_readl(RSET_USBH_PRIV, USBH_PRIV_SWAP_6368_REG);
-	if (is_device)
-		val |= USBH_PRIV_SWAP_USBD_MASK;
-	else
-		val &= ~USBH_PRIV_SWAP_USBD_MASK;
-	bcm_rset_writel(RSET_USBH_PRIV, val, USBH_PRIV_SWAP_6368_REG);
+	bcm63xx_usb_priv_select_phy_mode(portmask, is_device);
 }
 
 /**
@@ -893,14 +879,9 @@ static void bcm63xx_select_phy_mode(struct bcm63xx_udc *udc, bool is_device)
  */
 static void bcm63xx_select_pullup(struct bcm63xx_udc *udc, bool is_on)
 {
-	u32 val, portmask = BIT(udc->pd->port_no);
+	u32 portmask = BIT(udc->pd->port_no);
 
-	val = bcm_rset_readl(RSET_USBH_PRIV, USBH_PRIV_UTMI_CTL_6368_REG);
-	if (is_on)
-		val &= ~(portmask << USBH_PRIV_UTMI_CTL_NODRIV_SHIFT);
-	else
-		val |= (portmask << USBH_PRIV_UTMI_CTL_NODRIV_SHIFT);
-	bcm_rset_writel(RSET_USBH_PRIV, val, USBH_PRIV_UTMI_CTL_6368_REG);
+	bcm63xx_usb_priv_select_pullup(portmask, is_on);
 }
 
 /**
