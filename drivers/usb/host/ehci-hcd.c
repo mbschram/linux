@@ -460,6 +460,8 @@ static int ehci_init(struct usb_hcd *hcd)
 	 */
 	ehci->need_io_watchdog = 1;
 
+	ignore_oc |= ehci->ignore_oc;
+
 	hrtimer_init(&ehci->hrtimer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
 	ehci->hrtimer.function = ehci_hrtimer_func;
 	ehci->next_hrtimer_event = EHCI_HRTIMER_NO_EVENT;

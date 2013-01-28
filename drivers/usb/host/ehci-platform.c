@@ -61,6 +61,9 @@ static int ehci_platform_reset(struct usb_hcd *hcd)
 
 	if (pdata->no_io_watchdog)
 		ehci->need_io_watchdog = 0;
+
+	ehci->ignore_oc = pdata->ignore_oc;
+
 	return 0;
 }
 
