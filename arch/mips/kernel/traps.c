@@ -309,6 +309,9 @@ static void __show_regs(const struct pt_regs *regs)
 	printk("\n");
 
 	printk("Cause : %08x\n", cause);
+#ifdef CONFIG_CPU_BMIPS4350
+	printk("Thread ID: %1x\n", read_c0_brcm_cmt_local());
+#endif
 
 	cause = (cause & CAUSEF_EXCCODE) >> CAUSEB_EXCCODE;
 	if (1 <= cause && cause <= 5)
@@ -1780,8 +1783,12 @@ void per_cpu_trap_init(bool is_boot_cpu)
 	}
 #endif /* CONFIG_MIPS_MT_SMTC */
 
-	if (!cpu_data[cpu].asid_cache)
+	if (!cpu_data[cpu].asid_cache) {
 		cpu_data[cpu].asid_cache = ASID_FIRST_VERSION;
+#if defined(CONFIG_SMP) && defined(CONFIG_CPU_BMIPS4350)
+		cpu_data[cpu].asid_cache |= cpu;
+#endif
+	}
 
 	atomic_inc(&init_mm.mm_count);
 	current->active_mm = &init_mm;

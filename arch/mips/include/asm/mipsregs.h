@@ -89,6 +89,11 @@
 #define CP0_DWATCH $19
 
 /*
+ * Broadcom BMIPS43xx CP0 registers
+ */
+#define CP0_CMT_LOCAL	$22, 3
+
+/*
  * Coprocessor 0 Set 1 register names
  */
 #define CP0_S1_DERRADDR0  $26

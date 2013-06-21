@@ -26,6 +26,8 @@
 #define STATMASK 0x1e
 #elif defined(CONFIG_CPU_R3000) || defined(CONFIG_CPU_TX39XX)
 #define STATMASK 0x3f
+#elif defined(CONFIG_SMP) && defined(CONFIG_CPU_BMIPS4350)
+#define STATMASK 0x1c
 #else
 #define STATMASK 0x1f
 #endif
@@ -97,6 +99,10 @@
 #define PTEBASE_SHIFT	19	/* TCBIND */
 #define CPU_ID_REG CP0_TCBIND
 #define CPU_ID_MFC0 mfc0
+#elif defined(CONFIG_CPU_BMIPS4350)
+#define PTEBASE_SHIFT	31	/* CMT_LOCAL TPID */
+#define CPU_ID_REG CP0_CMT_LOCAL
+#define CPU_ID_MFC0 mfc0
 #elif defined(CONFIG_MIPS_PGD_C0_CONTEXT)
 #define PTEBASE_SHIFT	48	/* XCONTEXT */
 #define CPU_ID_REG CP0_XCONTEXT
@@ -118,6 +124,9 @@
 		dsll	k1, 16
 #endif
 		LONG_SRL	k0, PTEBASE_SHIFT
+#if defined(CONFIG_SMP) && defined(CONFIG_CPU_BMIPS4350)
+		sll		k0, k0, 2
+#endif
 		LONG_ADDU	k1, k0
 		LONG_L	k1, %lo(kernelsp)(k1)
 		.endm
@@ -125,6 +134,9 @@
 		.macro	set_saved_sp stackp temp temp2
 		CPU_ID_MFC0	\temp, CPU_ID_REG
 		LONG_SRL	\temp, PTEBASE_SHIFT
+#if defined(CONFIG_SMP) && defined(CONFIG_CPU_BMIPS4350)
+		sll		\temp, 2
+#endif
 		LONG_S	\stackp, kernelsp(\temp)
 		.endm
 #else

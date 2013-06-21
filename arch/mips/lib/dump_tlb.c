@@ -6,11 +6,24 @@
  */
 #include <linux/kernel.h>
 #include <linux/mm.h>
+#include <linux/spinlock.h>
 
 #include <asm/mipsregs.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
 #include <asm/tlbdebug.h>
+
+extern spinlock_t bmips4350_jtlb_lock;
+
+#ifdef CONFIG_CPU_BMIPS4350
+#define ENTER_CRITICAL(flags)	\
+	spin_lock_irqsave(&bmips4350_jtlb_lock, flags)
+#define EXIT_CRITICAL(flags)	\
+	spin_unlock_irqrestore(&bmips4350_jtlb_lock, flags)
+#else
+#define ENTER_CRITICAL(flags)
+#define EXIT_CRITICAL(flags)
+#endif
 
 static inline const char *msk2str(unsigned int mask)
 {
@@ -51,12 +64,14 @@ static void dump_tlb(int first, int last)
 	unsigned long s_entryhi, entryhi, asid;
 	unsigned long long entrylo0, entrylo1;
 	unsigned int s_index, s_pagemask, pagemask, c0, c1, i;
+	unsigned long __maybe_unused flags;
 
 	s_pagemask = read_c0_pagemask();
 	s_entryhi = read_c0_entryhi();
 	s_index = read_c0_index();
 	asid = s_entryhi & 0xff;
 
+	ENTER_CRITICAL(flags);
 	for (i = first; i <= last; i++) {
 		write_c0_index(i);
 		BARRIER();
@@ -102,6 +117,7 @@ static void dump_tlb(int first, int last)
 	}
 	printk("\n");
 
+	EXIT_CRITICAL(flags);
 	write_c0_entryhi(s_entryhi);
 	write_c0_index(s_index);
 	write_c0_pagemask(s_pagemask);

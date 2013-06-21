@@ -14,6 +14,7 @@
 #include <linux/mm.h>
 #include <linux/hugetlb.h>
 #include <linux/module.h>
+#include <linux/spinlock.h>
 
 #include <asm/cpu.h>
 #include <asm/bootinfo.h>
@@ -28,6 +29,8 @@ extern void build_tlb_refill_handler(void);
  * MIPS32 will take revenge ...
  */
 #define UNIQUE_ENTRYHI(idx) (CKSEG0 + ((idx) << (PAGE_SHIFT + 1)))
+
+DEFINE_SPINLOCK(bmips4350_jtlb_lock);
 
 /* Atomicity and interruptability */
 #ifdef CONFIG_MIPS_MT_SMTC
@@ -44,6 +47,12 @@ extern void build_tlb_refill_handler(void);
 	evpe(mvpflags); \
 	local_irq_restore(flags); \
 	}
+#endif
+#ifdef CONFIG_CPU_BMIPS4350
+#define ENTER_CRITICAL(flags) \
+	spin_lock_irqsave(&bmips4350_jtlb_lock, flags);
+#define EXIT_CRITICAL(flags) \
+	spin_unlock_irqrestore(&bmips4350_jtlb_lock, flags);
 #else
 
 #define ENTER_CRITICAL(flags) local_irq_save(flags)

@@ -80,6 +80,8 @@ extern unsigned long smtc_asid_mask;
 #define ASID_MASK	(smtc_asid_mask)
 #define HW_ASID_MASK	0xff
 /* End SMTC/34K debug hack */
+#elif defined(CONFIG_SMP) && defined(CONFIG_BMIPS4350)
+#define ASID_MASK	0x2	/* each core has its own set of ASID */
 #else /* FIXME: not correct for R6000 */
 
 #define ASID_INC	0x1

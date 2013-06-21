@@ -28,6 +28,7 @@
 #include <linux/string.h>
 #include <linux/init.h>
 #include <linux/cache.h>
+#include <linux/spinlock.h>
 
 #include <asm/cacheflush.h>
 #include <asm/pgtable.h>
@@ -43,6 +44,8 @@
  */
 extern void tlb_do_page_fault_0(void);
 extern void tlb_do_page_fault_1(void);
+
+extern spinlock_t bmips4350_jtlb_lock;
 
 struct work_registers {
 	int r1;
@@ -278,6 +281,7 @@ static inline void dump_handler(const char *symbol, const u32 *handler, int coun
 #define C0_ENTRYHI	10, 0
 #define C0_EPC		14, 0
 #define C0_XCONTEXT	20, 0
+#define C0_CMT_LOCAL	22, 3
 
 #ifdef CONFIG_64BIT
 # define GET_CONTEXT(buf, reg) UASM_i_MFC0(buf, reg, C0_XCONTEXT)
@@ -401,6 +405,42 @@ static void build_restore_work_registers(u32 **p)
 	UASM_i_LW(p, 1, offsetof(struct tlb_reg_save, a), K0);
 	UASM_i_LW(p, 2, offsetof(struct tlb_reg_save, b), K0);
 }
+
+/*
+ * Broadcom BMIPS4350 Joint TLB lock
+ */
+#if defined(CONFIG_SMP) && defined(CONFIG_CPU_BMIPS4350)
+static void __cpuinit
+build_bmips4350_tlb_trylock(u32 **p, struct uasm_reloc **r,
+			int ptr, int tmp, enum label_id lid)
+{
+	uasm_i_lui(p, ptr, uasm_rel_hi((long)&bmips4350_jtlb_lock));
+	uasm_i_ll(p, tmp, uasm_rel_lo((long)&bmips4350_jtlb_lock), ptr);
+	uasm_il_bnez(p, r, tmp, lid);
+	uasm_i_ori(p, tmp, tmp, 1);
+	uasm_i_sc(p, tmp, uasm_rel_lo((long)&bmips4350_jtlb_lock), ptr);
+	uasm_il_beqz(p, r, tmp, lid);
+	uasm_i_sync(p);
+}
+
+static void __cpuinit
+build_bmips4350_tlb_unlock(u32 **p, struct uasm_reloc **rr, int tmp)
+{
+	uasm_i_lui(p, tmp, uasm_rel_hi((long)&bmips4350_jtlb_lock));
+	uasm_i_sync(p);
+	uasm_i_sw(p, 0, uasm_rel_lo((long)&bmips4350_jtlb_lock), tmp);
+}
+#else
+static inline void build_bmips4350_tlb_trylock(u32 **p, struct uasm_reloc **r,
+				int ptr, int tmp, enum label_id lid)
+{
+}
+
+static inline void build_bmips4350_tlb_unlock(u32 **p, struct uasm_reloc **r,
+				int tmp)
+{
+}
+#endif /* CONFIG_SMP && CONFIG_CPU_BMIPS4350 */
 
 #ifndef CONFIG_MIPS_PGD_C0_CONTEXT
 
@@ -836,12 +876,19 @@ build_get_pmde64(u32 **p, struct uasm_label **l, struct uasm_reloc **r,
 		uasm_i_drotr(p, ptr, ptr, 11);
 	}
 #elif defined(CONFIG_SMP)
-# ifdef	 CONFIG_MIPS_MT_SMTC
+# if defined(CONFIG_MIPS_MT_SMTC)
 	/*
 	 * SMTC uses TCBind value as "CPU" index
 	 */
 	uasm_i_mfc0(p, ptr, C0_TCBIND);
 	uasm_i_dsrl_safe(p, ptr, ptr, 19);
+# elif defined(CONFIG_CPU_BMIPS4350)
+	/*
+	 * BMIPS4350 uses CMT_LOCAL TPID as "CPU" index
+	 */
+	uasm_i_mfc0(p, ptr, C0_CMT_LOCAL);
+	uasm_i_srl(p, ptr, ptr, 31);
+	uasm_i_sll(p, ptr, ptr, 2);
 # else
 	/*
 	 * 64 bit SMP running in XKPHYS has smp_processor_id() << 3
@@ -956,13 +1003,21 @@ build_get_pgde32(u32 **p, unsigned int tmp, unsigned int ptr)
 
 	/* 32 bit SMP has smp_processor_id() stored in CONTEXT. */
 #ifdef CONFIG_SMP
-#ifdef	CONFIG_MIPS_MT_SMTC
+#if defined(CONFIG_MIPS_MT_SMTC)
 	/*
 	 * SMTC uses TCBind value as "CPU" index
 	 */
 	uasm_i_mfc0(p, ptr, C0_TCBIND);
 	UASM_i_LA_mostly(p, tmp, pgdc);
 	uasm_i_srl(p, ptr, ptr, 19);
+#elif defined(CONFIG_CPU_BMIPS4350)
+	/*
+	 * BMIPS4350 uses CMT_LOCAL TPID as "CPU" index
+	 */
+	uasm_i_mfc0(p, ptr, C0_CMT_LOCAL);
+	UASM_i_LA_mostly(p, tmp, pgdc);
+	uasm_i_srl(p, ptr, ptr, 31);
+	uasm_i_sll(p, ptr, ptr, 2);
 #else
 	/*
 	 * smp_processor_id() << 2 is stored in CONTEXT.
@@ -1317,17 +1372,18 @@ static void build_r4000_tlb_refill_handler(void)
 #ifdef CONFIG_64BIT
 		build_get_pmde64(&p, &l, &r, K0, K1); /* get pmd in K1 */
 #else
+		build_bmips4350_tlb_trylock(&p, &r, K1, K0, tlb_random);
 		build_get_pgde32(&p, K0, K1); /* get pgd in K1 */
 #endif
 
 #ifdef CONFIG_MIPS_HUGE_TLB_SUPPORT
 		build_is_huge_pte(&p, &r, K0, K1, label_tlb_huge_update);
 #endif
-
 		build_get_ptep(&p, K0, K1);
 		build_update_entries(&p, K0, K1);
 		build_tlb_write_entry(&p, &l, &r, tlb_random);
 		uasm_l_leave(&l, p);
+		build_bmips4350_tlb_unlock(&p, &r, K0);
 		uasm_i_eret(&p); /* return from trap */
 	}
 #ifdef CONFIG_MIPS_HUGE_TLB_SUPPORT
@@ -1678,6 +1734,7 @@ build_pte_modifiable(u32 **p, struct uasm_reloc **r,
 	}
 }
 
+
 #ifndef CONFIG_MIPS_PGD_C0_CONTEXT
 
 
@@ -1849,6 +1906,7 @@ build_r4000_tlbchange_handler_head(u32 **p, struct uasm_label **l,
 #ifdef CONFIG_64BIT
 	build_get_pmde64(p, l, r, wr.r1, wr.r2); /* get pmd in ptr */
 #else
+	build_bmips4350_tlb_trylock(p, r, K1, K0, label_nopage_tlbl);
 	build_get_pgde32(p, wr.r1, wr.r2); /* get pgd in ptr */
 #endif
 
@@ -1887,6 +1945,7 @@ build_r4000_tlbchange_handler_tail(u32 **p, struct uasm_label **l,
 	build_tlb_write_entry(p, l, r, tlb_indexed);
 	uasm_l_leave(l, *p);
 	build_restore_work_registers(p);
+	build_bmips4350_tlb_unlock(p, r, K0);
 	uasm_i_eret(p); /* return from trap */
 
 #ifdef CONFIG_64BIT
