@@ -1033,7 +1033,7 @@ static int r6040_mii_probe(struct net_device *dev)
 	struct r6040_private *lp = netdev_priv(dev);
 	struct phy_device *phydev = NULL;
 
-	phydev = phy_find_first(lp->mii_bus);
+	phydev = lp->mii_bus->phy_map[card_idx + 1];
 	if (!phydev) {
 		dev_err(&lp->pdev->dev, "no PHY found\n");
 		return -ENODEV;
@@ -1187,6 +1187,7 @@ static int r6040_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	lp->mii_bus->read = r6040_mdiobus_read;
 	lp->mii_bus->write = r6040_mdiobus_write;
 	lp->mii_bus->name = "r6040_eth_mii";
+	lp->mii_bus->phy_mask = ~(1 << (card_idx + 1));
 	snprintf(lp->mii_bus->id, MII_BUS_ID_SIZE, "%s-%x",
 		dev_name(&pdev->dev), card_idx);
 	lp->mii_bus->irq = kmalloc_array(PHY_MAX_ADDR, sizeof(int), GFP_KERNEL);
