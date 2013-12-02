@@ -43,6 +43,19 @@
 #define BCM3368_RESET_PCIE	0
 #define BCM3368_RESET_PCIE_EXT	0
 
+#define BCM3380_RESET_SPI	SOFTRESET_3380_SPI_MASK
+#define BCM3380_RESET_ENET	0
+#define BCM3380_RESET_USBH	0
+#define BCM3380_RESET_USBD	0
+#define BCM3380_RESET_DSL	0
+#define BCM3380_RESET_SAR	0
+#define BCM3380_RESET_EPHY	0
+#define BCM3380_RESET_ENETSW	0
+#define BCM3380_RESET_PCM	SOFTRESET_3380_PCM_MASK
+#define BCM3380_RESET_MPI	0
+#define BCM3380_RESET_PCIE	0
+#define BCM3380_RESET_PCIE_EXT	0
+
 #define BCM6328_RESET_SPI	SOFTRESET_6328_SPI_MASK
 #define BCM6328_RESET_ENET	0
 #define BCM6328_RESET_USBH	SOFTRESET_6328_USBH_MASK
@@ -134,6 +147,10 @@ static const u32 bcm3368_reset_bits[] = {
 	__GEN_RESET_BITS_TABLE(3368)
 };
 
+static const u32 bcm3380_reset_bits[] = {
+	__GEN_RESET_BITS_TABLE(3380)
+};
+
 static const u32 bcm6328_reset_bits[] = {
 	__GEN_RESET_BITS_TABLE(6328)
 };
@@ -166,6 +183,9 @@ static int __init bcm63xx_reset_bits_init(void)
 	if (BCMCPU_IS_3368()) {
 		reset_reg = PERF_SOFTRESET_6358_REG;
 		bcm63xx_reset_bits = bcm3368_reset_bits;
+	} else if (BCMCPU_IS_3380()) {
+		reset_reg = PERF_SOFTRESET_6358_REG;
+		bcm63xx_reset_bits = bcm3380_reset_bits;
 	} else if (BCMCPU_IS_6328()) {
 		reset_reg = PERF_SOFTRESET_6328_REG;
 		bcm63xx_reset_bits = bcm6328_reset_bits;
@@ -193,6 +213,13 @@ static int __init bcm63xx_reset_bits_init(void)
 #ifdef CONFIG_BCM63XX_CPU_3368
 static const u32 bcm63xx_reset_bits[] = {
 	__GEN_RESET_BITS_TABLE(3368)
+};
+#define reset_reg PERF_SOFTRESET_6358_REG
+#endif
+
+#ifdef CONFIG_BCM63XX_CPU_3380
+static const u32 bcm63xx_reset_bits[] = {
+	__GEN_RESET_BITS_TABLE(3380)
 };
 #define reset_reg PERF_SOFTRESET_6358_REG
 #endif

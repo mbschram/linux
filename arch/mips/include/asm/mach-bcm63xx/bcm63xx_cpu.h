@@ -10,6 +10,7 @@
  * arm mach-types)
  */
 #define BCM3368_CPU_ID		0x3368
+#define BCM3380_CPU_ID		0x3380
 #define BCM6328_CPU_ID		0x6328
 #define BCM6338_CPU_ID		0x6338
 #define BCM6345_CPU_ID		0x6345
@@ -34,6 +35,19 @@ unsigned int bcm63xx_get_cpu_freq(void);
 # define BCMCPU_IS_3368()	(bcm63xx_get_cpu_id() == BCM3368_CPU_ID)
 #else
 # define BCMCPU_IS_3368()	(0)
+#endif
+
+#ifdef CONFIG_BCM63XX_CPU_3380
+# ifdef bcm63xx_get_cpu_id
+#  undef bcm63xx_get_cpu_id
+#  define bcm63xx_get_cpu_id()	__bcm63xx_get_cpu_id()
+#  define BCMCPU_RUNTIME_DETECT
+# else
+#  define bcm63xx_get_cpu_id()	BCM3380_CPU_ID
+# endif
+# define BCMCPU_IS_3380()	(bcm63xx_get_cpu_id() == BCM3380_CPU_ID)
+#else
+# define BCMCPU_IS_3380()	(0)
 #endif
 
 #ifdef CONFIG_BCM63XX_CPU_6328
@@ -254,6 +268,52 @@ enum bcm63xx_regs_set {
 #define BCM_3368_RNG_BASE		(0xdeadbeef)
 #define BCM_3368_MISC_BASE		(0xdeadbeef)
 
+/*
+ * 3380 register set base address
+ */
+#define BCM_3380_DSL_LMEM_BASE		(0xdeadbeef)
+#define BCM_3380_PERF_BASE		(0xb4e00000)
+#define BCM_3380_TIMER_BASE		(0xb4e000c0)
+#define BCM_3380_WDT_BASE		(0xb4e000dc)
+#define BCM_3380_UART0_BASE		(0xb4e00200)
+#define BCM_3380_UART1_BASE		(0xb4e00220)
+#define BCM_3380_GPIO_BASE		(0xb4e00100)
+#define BCM_3380_SPI_BASE		(0xb4e00400)
+#define BCM_3380_HSSPI_BASE		(0xdeadbeef)
+#define BCM_3380_UDC0_BASE		(0xdeadbeef)
+#define BCM_3380_USBDMA_BASE		(0xdeadbeef)
+#define BCM_3380_OHCI0_BASE		(0xdeadbeef)
+#define BCM_3380_OHCI_PRIV_BASE		(0xdeadbeef)
+#define BCM_3380_USBH_PRIV_BASE		(0xdeadbeef)
+#define BCM_3380_USBD_BASE		(0xdeadbeef)
+#define BCM_3380_MPI_BASE		(0xdeadbeef)
+#define BCM_3380_PCMCIA_BASE		(0xdeadbeef)
+#define BCM_3380_PCIE_BASE		(0xdeadbeef)
+#define BCM_3380_SDRAM_REGS_BASE	(0xdeadbeef)
+#define BCM_3380_DSL_BASE		(0xdeadbeef)
+#define BCM_3380_UBUS_BASE		(0xdeadbeef)
+#define BCM_3380_ENET0_BASE		(0xdeadbeef)
+#define BCM_3380_ENET1_BASE		(0xdeadbeef)
+#define BCM_3380_ENETDMA_BASE		(0xdeadbeef)
+#define BCM_3380_ENETDMAC_BASE		(0xdeadbeef)
+#define BCM_3380_ENETDMAS_BASE		(0xdeadbeef)
+#define BCM_3380_ENETSW_BASE		(0xdeadbeef)
+#define BCM_3380_EHCI0_BASE		(0xdeadbeef)
+#define BCM_3380_SDRAM_BASE		(0xdeadbeef)
+#define BCM_3380_MEMC_BASE		(0x12000000)
+#define BCM_3380_DDR_BASE		(0xdeadbeef)
+#define BCM_3380_M2M_BASE		(0xdeadbeef)
+#define BCM_3380_ATM_BASE		(0xdeadbeef)
+#define BCM_3380_XTM_BASE		(0xdeadbeef)
+#define BCM_3380_XTMDMA_BASE		(0xdeadbeef)
+#define BCM_3380_XTMDMAC_BASE		(0xdeadbeef)
+#define BCM_3380_XTMDMAS_BASE		(0xdeadbeef)
+#define BCM_3380_PCM_BASE		(0xdeadbeef)
+#define BCM_3380_PCMDMA_BASE		(0xdeadbeef)
+#define BCM_3380_PCMDMAC_BASE		(0xdeadbeef)
+#define BCM_3380_PCMDMAS_BASE		(0xdeadbeef)
+#define BCM_3380_RNG_BASE		(0xdeadbeef)
+#define BCM_3380_MISC_BASE		(0xdeadbeef)
 /*
  * 6328 register sets base address
  */
@@ -689,6 +749,9 @@ static inline unsigned long bcm63xx_regset_address(enum bcm63xx_regs_set set)
 #ifdef CONFIG_BCM63XX_CPU_3368
 	__GEN_RSET(3368)
 #endif
+#ifdef CONFIG_BCM63XX_CPU_3380
+	__GEN_RSET(3380)
+#endif
 #ifdef CONFIG_BCM63XX_CPU_6328
 	__GEN_RSET(6328)
 #endif
@@ -800,6 +863,54 @@ enum bcm63xx_irq {
 #define BCM_3368_EXT_IRQ2		(IRQ_INTERNAL_BASE + 27)
 #define BCM_3368_EXT_IRQ3		(IRQ_INTERNAL_BASE + 28)
 
+/*
+ * 3380 irqs
+ */
+#define BCM_3380_TIMER_IRQ		(IRQ_INTERNAL_BASE + 0)
+#define BCM_3380_SPI_IRQ		(IRQ_INTERNAL_BASE + 1)
+#define BCM_3380_UART0_IRQ		(IRQ_INTERNAL_BASE + 2)
+#define BCM_3380_UART1_IRQ		(IRQ_INTERNAL_BASE + 3)
+#define BCM_3380_DSL_IRQ		0
+#define BCM_3380_UDC0_IRQ		0
+#define BCM_3380_OHCI0_IRQ		0
+#define BCM_3380_ENET0_IRQ		0
+#define BCM_3380_ENET1_IRQ		0
+#define BCM_3380_ENET_PHY_IRQ		0
+#define BCM_3380_ENET0_RXDMA_IRQ	0
+#define BCM_3380_ENET0_TXDMA_IRQ	0
+#define BCM_3380_HSSPI_IRQ		(IRQ_INTERNAL_BASE + 7)
+#define BCM_3380_EHCI0_IRQ		0
+#define BCM_3380_USBD_IRQ		0
+#define BCM_3380_USBD_RXDMA0_IRQ	0
+#define BCM_3380_USBD_TXDMA0_IRQ	0
+#define BCM_3380_USBD_RXDMA1_IRQ	0
+#define BCM_3380_USBD_TXDMA1_IRQ	0
+#define BCM_3380_USBD_RXDMA2_IRQ	0
+#define BCM_3380_USBD_TXDMA2_IRQ	0
+#define BCM_3380_ENET1_RXDMA_IRQ        0
+#define BCM_3380_ENET1_TXDMA_IRQ        0
+#define BCM_3380_PCI_IRQ		0
+#define BCM_3380_PCMCIA_IRQ		0
+#define BCM_3380_ATM_IRQ		0
+#define BCM_3380_ENETSW_RXDMA0_IRQ	0
+#define BCM_3380_ENETSW_RXDMA1_IRQ	0
+#define BCM_3380_ENETSW_RXDMA2_IRQ	0
+#define BCM_3380_ENETSW_RXDMA3_IRQ	0
+#define BCM_3380_ENETSW_TXDMA0_IRQ	0
+#define BCM_3380_ENETSW_TXDMA1_IRQ	0
+#define BCM_3380_ENETSW_TXDMA2_IRQ	0
+#define BCM_3380_ENETSW_TXDMA3_IRQ	0
+#define BCM_3380_XTM_IRQ		0
+#define BCM_3380_XTM_DMA0_IRQ		0
+
+#define BCM_3380_HIGH_IRQ_BASE		(IRQ_INTERNAL_BASE + 32)
+
+#define BCM_3380_EXT_IRQ0		(BCM_3380_HIGH_IRQ_BASE + 0)
+#define BCM_3380_EXT_IRQ1		(BCM_3380_HIGH_IRQ_BASE + 1)
+#define BCM_3380_EXT_IRQ2		(BCM_3380_HIGH_IRQ_BASE + 2)
+#define BCM_3380_EXT_IRQ3		(BCM_3380_HIGH_IRQ_BASE + 3)
+#define BCM_3380_EXT_IRQ4		(BCM_3380_HIGH_IRQ_BASE + 4)
+#define BCM_3380_EXT_IRQ5		(BCM_3380_HIGH_IRQ_BASE + 5)
 
 /*
  * 6328 irqs

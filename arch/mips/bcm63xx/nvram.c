@@ -70,7 +70,7 @@ void __init bcm63xx_nvram_init(void *addr)
 	 * firmware and not easily extractible, give at least a MAC address
 	 * pool.
 	 */
-	if (BCMCPU_IS_3368()) {
+	if (BCMCPU_IS_3368() || BCMCPU_IS_3380()) {
 		memcpy(nvram.mac_addr_base, hcs_mac_addr, ETH_ALEN);
 		nvram.mac_addr_count = 2;
 	}

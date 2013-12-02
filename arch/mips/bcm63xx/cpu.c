@@ -37,6 +37,14 @@ static const int bcm3368_irqs[] = {
 	__GEN_CPU_IRQ_TABLE(3368)
 };
 
+static const unsigned long bcm3380_regs_base[] = {
+	__GEN_CPU_REGS_TABLE(3380)
+};
+
+static const int bcm3380_irqs[] = {
+	__GEN_CPU_IRQ_TABLE(3380)
+};
+
 static const unsigned long bcm6328_regs_base[] = {
 	__GEN_CPU_REGS_TABLE(6328)
 };
@@ -125,6 +133,7 @@ static unsigned int detect_cpu_clock(void)
 {
 	switch (bcm63xx_get_cpu_id()) {
 	case BCM3368_CPU_ID:
+	case BCM3380_CPU_ID:
 		return 300000000;
 
 	case BCM6328_CPU_ID:
@@ -261,6 +270,9 @@ static unsigned int detect_memory_size(void)
 	unsigned int cols = 0, rows = 0, is_32bits = 0, banks = 0;
 	u32 val;
 
+	if (BCMCPU_IS_3380())
+		return (16 * 1024 * 1024);
+
 	if (BCMCPU_IS_6328() || BCMCPU_IS_6362())
 		return bcm_ddr_readl(DDR_CSEND_REG) << 24;
 
@@ -294,6 +306,8 @@ static unsigned int detect_memory_size(void)
 	return 1 << (cols + rows + (is_32bits + 1) + banks);
 }
 
+extern void prom_putchar(char p);
+
 void __init bcm63xx_cpu_init(void)
 {
 	unsigned int tmp;
@@ -302,7 +316,7 @@ void __init bcm63xx_cpu_init(void)
 	u32 chipid_reg;
 
 	/* soc registers location depends on cpu type */
-	chipid_reg = 0;
+	chipid_reg = BCM_3380_PERF_BASE;
 
 	switch (c->cputype) {
 	case CPU_BMIPS3300:
@@ -319,6 +333,9 @@ void __init bcm63xx_cpu_init(void)
 			break;
 		case 0x10:
 			chipid_reg = BCM_6345_PERF_BASE;
+			break;
+		case 0x70:
+			chipid_reg = BCM_3380_PERF_BASE;
 			break;
 		default:
 			chipid_reg = BCM_6368_PERF_BASE;
@@ -343,6 +360,10 @@ void __init bcm63xx_cpu_init(void)
 	case BCM3368_CPU_ID:
 		bcm63xx_regs_base = bcm3368_regs_base;
 		bcm63xx_irqs = bcm3368_irqs;
+		break;
+	case BCM3380_CPU_ID:
+		bcm63xx_regs_base = bcm3380_regs_base;
+		bcm63xx_irqs = bcm3380_irqs;
 		break;
 	case BCM6328_CPU_ID:
 		bcm63xx_regs_base = bcm6328_regs_base;

@@ -48,6 +48,33 @@
 					 CKCTL_3368_EMUSB_EN | \
 					 CKCTL_3368_USBU_EN)
 
+#define CKCTL_3368_ALL_SAFE_EN		(CKCTL_3368_MAC_EN | \
+					 CKCTL_3368_TC_EN | \
+					 CKCTL_3368_US_TOP_EN | \
+					 CKCTL_3368_DS_TOP_EN | \
+					 CKCTL_3368_APM_EN | \
+					 CKCTL_3368_SPI_EN | \
+					 CKCTL_3368_USBS_EN | \
+					 CKCTL_3368_BMU_EN | \
+					 CKCTL_3368_PCM_EN | \
+					 CKCTL_3368_NTP_EN | \
+					 CKCTL_3368_ACP_B_EN | \
+					 CKCTL_3368_ACP_A_EN | \
+					 CKCTL_3368_EMUSB_EN | \
+					 CKCTL_3368_USBU_EN)
+
+#define CKCTL_3368_DDR_EN		(1 << 0)
+#define CKCTL_3380_FPM_EN		(1 << 1)
+#define CKCTL_3380_CRYPTO_EN		(1 << 2)
+#define CKCTL_3380_EPHY_EN		(1 << 3)
+#define CKCTL_3380_PCIE_EN		(1 << 16)
+#define CKCTL_3380_SPI_EN		(1 << 17)
+#define CKCTL_3380_ENET0_EN		(1 << 18)
+#define CKCTL_3380_ENET1_EN		(1 << 19)
+#define CKCTL_3380_PCM_EN		(1 << 27)
+
+#define CKCTL_3380_ALL_SAFE_EN		(0)
+
 #define CKCTL_6328_PHYMIPS_EN		(1 << 0)
 #define CKCTL_6328_ADSL_QPROC_EN	(1 << 1)
 #define CKCTL_6328_ADSL_AFE_EN		(1 << 2)
@@ -215,6 +242,7 @@
 
 /* Interrupt Mask register */
 #define PERF_IRQMASK_3368_REG		0xc
+#define PERF_IRQMASK_3380_REG		0x30
 #define PERF_IRQMASK_6328_REG		0x20
 #define PERF_IRQMASK_6338_REG		0xc
 #define PERF_IRQMASK_6345_REG		0xc
@@ -225,6 +253,7 @@
 
 /* Interrupt Status register */
 #define PERF_IRQSTAT_3368_REG		0x10
+#define PERF_IRQSTAT_3380_REG		0x34
 #define PERF_IRQSTAT_6328_REG		0x28
 #define PERF_IRQSTAT_6338_REG		0x10
 #define PERF_IRQSTAT_6345_REG		0x10
@@ -235,6 +264,7 @@
 
 /* External Interrupt Configuration register */
 #define PERF_EXTIRQ_CFG_REG_3368	0x14
+#define PERF_EXTIRQ_CFG_REG_3380	0x6c
 #define PERF_EXTIRQ_CFG_REG_6328	0x18
 #define PERF_EXTIRQ_CFG_REG_6338	0x14
 #define PERF_EXTIRQ_CFG_REG_6345	0x14
@@ -255,6 +285,16 @@
 #define EXTIRQ_CFG_CLEAR_ALL_6348	(0xf << 10)
 #define EXTIRQ_CFG_MASK_ALL_6348	(0xf << 15)
 
+/* for 3380 only */
+#define EXTIRQ_CFG_SENSE_3380(x)	(1 << (x))
+#define EXTIRQ_CFG_STAT_3380(x)		(1 << (x + 6))
+#define EXTIRQ_CFG_CLEAR_3380(x)	(1 << (x + 6))
+#define EXTIRQ_CFG_MASK_3380(x)		(1 << (x + 12))
+#define EXTIRQ_CFG_BOTHEDGE_3380(x)	(1 << (x + 18))
+#define EXTIRQ_CFG_LEVELSENSE_3380(x)	(1 << (x + 24))
+#define EXTIRQ_CFG_CLEAR_ALL_3380	(0x1f << 12)
+#define EXTIRQ_CFG_MASK_ALL_3380	(0x1f << 12)
+
 /* for all others */
 #define EXTIRQ_CFG_SENSE(x)		(1 << (x))
 #define EXTIRQ_CFG_STAT(x)		(1 << (x + 4))
@@ -267,6 +307,7 @@
 
 /* Soft Reset register */
 #define PERF_SOFTRESET_REG		0x28
+#define PERF_SOFTRESET_3380_REG		0x8c
 #define PERF_SOFTRESET_6328_REG		0x10
 #define PERF_SOFTRESET_6358_REG		0x34
 #define PERF_SOFTRESET_6362_REG		0x10
@@ -278,6 +319,9 @@
 #define SOFTRESET_3368_EPHY_MASK	(1 << 6)
 #define SOFTRESET_3368_USBS_MASK	(1 << 11)
 #define SOFTRESET_3368_PCM_MASK		(1 << 13)
+
+#define SOFTRESET_3380_SPI_MASK		(1 << 0)
+#define SOFTRESET_3380_PCM_MASK		(1 << 13)
 
 #define SOFTRESET_6328_SPI_MASK		(1 << 0)
 #define SOFTRESET_6328_EPHY_MASK	(1 << 1)

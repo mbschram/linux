@@ -5,6 +5,9 @@ config BCM63XX_CPU_3368
 	bool "support 3368 CPU"
 	select HW_HAS_PCI
 
+config BCM63XX_CPU_3380
+	bool "support 3380 CPU"
+
 config BCM63XX_CPU_6328
 	bool "support 6328 CPU"
 	select HW_HAS_PCI

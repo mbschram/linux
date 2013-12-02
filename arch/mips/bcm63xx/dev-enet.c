@@ -213,6 +213,9 @@ int __init bcm63xx_enet_register(int unit,
 	if (unit > 1)
 		return -ENODEV;
 
+	if (BCMCPU_IS_3380())
+		return -ENODEV;
+
 	if (unit == 1 && (BCMCPU_IS_6338() || BCMCPU_IS_6345()))
 		return -ENODEV;
 
