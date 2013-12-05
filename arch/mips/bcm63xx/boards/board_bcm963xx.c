@@ -69,6 +69,19 @@ static struct board_info __initdata board_cvg834g = {
 #endif
 
 /*
+ * known 3380 boards
+ */
+#ifdef CONFIG_BCM63XX_CPU_3380
+static struct board_info __initdata board_bcm93380 = {
+	.name				= "BCM93380",
+	.expected_cpu_id		= 0x3380,
+
+	.has_uart0			= 1,
+	.has_uart1			= 1,
+};
+#endif
+
+/*
  * known 6328 boards
  */
 #ifdef CONFIG_BCM63XX_CPU_6328
@@ -678,6 +691,9 @@ static const struct board_info __initconst *bcm963xx_boards[] = {
 #ifdef CONFIG_BCM63XX_CPU_3368
 	&board_cvg834g,
 #endif
+#ifdef CONFIG_BCM63XX_CPU_3380
+	&board_bcm93380,
+#endif
 #ifdef CONFIG_BCM63XX_CPU_6328
 	&board_96328avng,
 #endif
@@ -770,6 +786,8 @@ void __init board_prom_init(void)
 	 */
 	if (BCMCPU_IS_6328() || BCMCPU_IS_6362()) {
 		val = 0x18000000;
+	} else if (BCMCPU_IS_3380()) {
+		val = 0x1fc00000;
 	} else {
 		val = bcm_mpi_readl(MPI_CSBASE_REG(0));
 		val &= MPI_CSBASE_BASE_MASK;
@@ -787,7 +805,7 @@ void __init board_prom_init(void)
 
 	bcm63xx_nvram_init(boot_addr + BCM963XX_NVRAM_OFFSET);
 
-	if (BCMCPU_IS_3368()) {
+	if (BCMCPU_IS_3368() || BCMCPU_IS_3380()) {
 		hcs = (struct bcm_hcs *)boot_addr;
 		board_name = hcs->filename;
 	} else {
