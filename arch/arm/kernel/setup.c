@@ -910,12 +910,20 @@ void __init hyp_mode_check(void)
 #endif
 }
 
+#ifdef CONFIG_OF_EARLY_FLATTREE
+extern char __dtb_start[];
+#endif
+
 void __init setup_arch(char **cmdline_p)
 {
 	const struct machine_desc *mdesc;
 
 	setup_processor();
+#ifdef CONFIG_OF_EARLY_FLATTREE
+	mdesc = setup_machine_fdt(__pa(__dtb_start));
+#else
 	mdesc = setup_machine_fdt(__atags_pointer);
+#endif
 	if (!mdesc)
 		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
 	machine_desc = mdesc;
