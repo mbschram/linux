@@ -649,3 +649,19 @@ endif
 
 always		:= $(dtb-y)
 clean-files	:= *.dtb
+
+builtindtb-$(CONFIG_ARCH_BCM_63XX)	+= bcm963138dvt
+
+obj-y	+= $(builtindtb-y).dtb.o
+targets	+= $(builtindtb-y).dtb
+
+.SECONDARY: $(obj)/$(builtindtb-y).dtb.S
+
+# *.dtb used to be generated in the directory above. Clean out the
+# old build results so people don't accidentally use them.
+dtbs: $(addprefix $(obj)/, $(dtb-y)) $(addprefix $(obj)/, $(builtindtb-y).dtb)
+	$(Q)rm -f $(obj)/../*.dtb
+
+clean-files := *.dtb *.dtb.S
+
+dtbs_install: $(addsuffix _dtbinst_, $(dtb-y))
