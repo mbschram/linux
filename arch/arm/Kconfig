@@ -1819,6 +1819,7 @@ config DEPRECATED_PARAM_STRUCT
 # TEXT and BSS so we preserve their values in the config files.
 config ZBOOT_ROM_TEXT
 	hex "Compressed ROM boot loader base address"
+	default "0x8000" if ARCH_BCM_63XX
 	default "0"
 	help
 	  The physical address at which the ROM-able zImage is to be
@@ -1844,7 +1845,8 @@ config ZBOOT_ROM_BSS
 config ZBOOT_ROM
 	bool "Compressed boot loader in ROM/flash"
 	depends on ZBOOT_ROM_TEXT != ZBOOT_ROM_BSS
-	depends on !ARM_APPENDED_DTB && !XIP_KERNEL && !AUTO_ZRELADDR
+	depends on ARCH_BCM_63XX || (!ARM_APPENDED_DTB && !XIP_KERNEL && !AUTO_ZRELADDR)
+	default ARCH_BCM_63XX
 	help
 	  Say Y here if you intend to execute your compressed kernel image
 	  (zImage) directly from ROM or flash.  If unsure, say N.
