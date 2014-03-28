@@ -100,33 +100,11 @@ static int ip175c_config_init(struct phy_device *phydev)
 	return 0;
 }
 
-static int ip1xx_reset(struct phy_device *phydev)
-{
-	int bmcr;
-
-	/* Software Reset PHY */
-	bmcr = phy_read(phydev, MII_BMCR);
-	if (bmcr < 0)
-		return bmcr;
-	bmcr |= BMCR_RESET;
-	bmcr = phy_write(phydev, MII_BMCR, bmcr);
-	if (bmcr < 0)
-		return bmcr;
-
-	do {
-		bmcr = phy_read(phydev, MII_BMCR);
-		if (bmcr < 0)
-			return bmcr;
-	} while (bmcr & BMCR_RESET);
-
-	return 0;
-}
-
 static int ip1001_config_init(struct phy_device *phydev)
 {
 	int c;
 
-	c = ip1xx_reset(phydev);
+	c = genphy_soft_reset(phydev);
 	if (c < 0)
 		return c;
 
@@ -166,7 +144,7 @@ static int ip101a_g_config_init(struct phy_device *phydev)
 {
 	int c;
 
-	c = ip1xx_reset(phydev);
+	c = genphy_soft_reset(phydev);
 	if (c < 0)
 		return c;
 
