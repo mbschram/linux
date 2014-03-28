@@ -96,19 +96,7 @@ static int moxart_mdio_write(struct mii_bus *bus, int mii_id,
 
 static int moxart_mdio_reset(struct mii_bus *bus)
 {
-	int data, i;
-
-	for (i = 0; i < PHY_MAX_ADDR; i++) {
-		data = moxart_mdio_read(bus, i, MII_BMCR);
-		if (data < 0)
-			continue;
-
-		data |= BMCR_RESET;
-		if (moxart_mdio_write(bus, i, MII_BMCR, data) < 0)
-			continue;
-	}
-
-	return 0;
+	return mdiobus_reset_phys(bus);
 }
 
 static int moxart_mdio_probe(struct platform_device *pdev)
