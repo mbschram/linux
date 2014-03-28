@@ -206,8 +206,7 @@ static int marvell_config_aneg(struct phy_device *phydev)
 	/* The Marvell PHY has an errata which requires
 	 * that certain registers get written in order
 	 * to restart autonegotiation */
-	err = phy_write(phydev, MII_BMCR, BMCR_RESET);
-
+	err = genphy_soft_reset(phydev);
 	if (err < 0)
 		return err;
 
@@ -252,11 +251,7 @@ static int marvell_config_aneg(struct phy_device *phydev)
 		 * genphy_config_aneg() call above) must be followed by
 		 * a software reset. Otherwise, the write has no effect.
 		 */
-		bmcr = phy_read(phydev, MII_BMCR);
-		if (bmcr < 0)
-			return bmcr;
-
-		err = phy_write(phydev, MII_BMCR, bmcr | BMCR_RESET);
+		err = genphy_soft_reset(phydev);
 		if (err < 0)
 			return err;
 	}
@@ -376,7 +371,7 @@ static int m88e1121_config_aneg(struct phy_device *phydev)
 
 	phy_write(phydev, MII_MARVELL_PHY_PAGE, oldpage);
 
-	err = phy_write(phydev, MII_BMCR, BMCR_RESET);
+	err = genphy_soft_reset(phydev);
 	if (err < 0)
 		return err;
 
@@ -437,13 +432,9 @@ static int m88e1116r_config_init(struct phy_device *phydev)
 	int temp;
 	int err;
 
-	temp = phy_read(phydev, MII_BMCR);
-	temp |= BMCR_RESET;
-	err = phy_write(phydev, MII_BMCR, temp);
+	err = genphy_soft_reset(phydev);
 	if (err < 0)
 		return err;
-
-	mdelay(500);
 
 	err = phy_write(phydev, MII_MARVELL_PHY_PAGE, 0);
 	if (err < 0)
@@ -470,13 +461,9 @@ static int m88e1116r_config_init(struct phy_device *phydev)
 	if (err < 0)
 		return err;
 
-	temp = phy_read(phydev, MII_BMCR);
-	temp |= BMCR_RESET;
-	err = phy_write(phydev, MII_BMCR, temp);
+	err = genphy_soft_reset(phydev);
 	if (err < 0)
 		return err;
-
-	mdelay(500);
 
 	return 0;
 }
@@ -584,12 +571,9 @@ static int m88e1111_config_init(struct phy_device *phydev)
 			return err;
 
 		/* soft reset */
-		err = phy_write(phydev, MII_BMCR, BMCR_RESET);
+		err = genphy_soft_reset(phydev);
 		if (err < 0)
 			return err;
-		do
-			temp = phy_read(phydev, MII_BMCR);
-		while (temp & BMCR_RESET);
 
 		temp = phy_read(phydev, MII_M1111_PHY_EXT_SR);
 		if (temp < 0)
@@ -605,14 +589,14 @@ static int m88e1111_config_init(struct phy_device *phydev)
 	if (err < 0)
 		return err;
 
-	return phy_write(phydev, MII_BMCR, BMCR_RESET);
+	return genphy_soft_reset(phydev);
 }
 
 static int m88e1118_config_aneg(struct phy_device *phydev)
 {
 	int err;
 
-	err = phy_write(phydev, MII_BMCR, BMCR_RESET);
+	err = genphy_soft_reset(phydev);
 	if (err < 0)
 		return err;
 
@@ -661,7 +645,7 @@ static int m88e1118_config_init(struct phy_device *phydev)
 	if (err < 0)
 		return err;
 
-	return phy_write(phydev, MII_BMCR, BMCR_RESET);
+	return genphy_soft_reset(phydev);
 }
 
 static int m88e1149_config_init(struct phy_device *phydev)
@@ -687,7 +671,7 @@ static int m88e1149_config_init(struct phy_device *phydev)
 	if (err < 0)
 		return err;
 
-	return phy_write(phydev, MII_BMCR, BMCR_RESET);
+	return genphy_soft_reset(phydev);
 }
 
 static int m88e1145_config_init(struct phy_device *phydev)
