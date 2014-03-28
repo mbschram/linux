@@ -421,6 +421,50 @@ int mdiobus_write(struct mii_bus *bus, int addr, u32 regnum, u16 val)
 EXPORT_SYMBOL(mdiobus_write);
 
 /**
+ * mdiobus_reset_phys - Convenience function for software resetting PHYs
+ * @bus: the mii_bus struct
+ *
+ * NOTE: some quirky PHY devices might need to be reset before they can be
+ * succesfully identified reading their MII_PHYSID1 and MII_PHYSID2 register
+ * use this function only for these special cases.
+ *
+ * See phy_device.c::phy_poll_reset for the specification details.
+ */
+int mdiobus_reset_phys(struct mii_bus *bus)
+{
+	unsigned int i, retries = 12;
+	int ret;
+
+	for (i = 0; i < PHY_MAX_ADDR; i++) {
+		/* Skip over PHYs that we do not want to be probing for */
+		if (bus->phy_mask & BIT(i))
+			continue;
+
+		/* Poll until the reset bit is cleared (50ms per retry ==
+		 * 0.6 sec)
+		 */
+		retries = 12;
+
+		ret = mdiobus_write(bus, i, MII_BMCR, BMCR_RESET);
+		if (ret < 0)
+			return ret;
+
+		do {
+			msleep(50);
+			ret = mdiobus_read(bus, i, MII_BMCR);
+			if (ret < 0)
+				return ret;
+		} while (ret & BMCR_RESET && --retries);
+
+		if (ret & BMCR_RESET)
+			return -ETIMEDOUT;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(mdiobus_reset_phys);
+
+/**
  * mdio_bus_match - determine if given PHY driver supports the given PHY device
  * @dev: target PHY device
  * @drv: given PHY driver
