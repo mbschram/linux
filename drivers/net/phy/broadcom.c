@@ -353,7 +353,7 @@ static int brcm_fet_config_init(struct phy_device *phydev)
 	int reg, err, err2, brcmtest;
 
 	/* Reset the PHY to bring it to a known state. */
-	err = phy_write(phydev, MII_BMCR, BMCR_RESET);
+	err = genphy_soft_reset(phydev);
 	if (err < 0)
 		return err;
 
