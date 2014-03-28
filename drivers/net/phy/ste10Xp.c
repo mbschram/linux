@@ -34,23 +34,7 @@
 
 static int ste10Xp_config_init(struct phy_device *phydev)
 {
-	int value, err;
-
-	/* Software Reset PHY */
-	value = phy_read(phydev, MII_BMCR);
-	if (value < 0)
-		return value;
-
-	value |= BMCR_RESET;
-	err = phy_write(phydev, MII_BMCR, value);
-	if (err < 0)
-		return err;
-
-	do {
-		value = phy_read(phydev, MII_BMCR);
-	} while (value & BMCR_RESET);
-
-	return 0;
+	return genphy_soft_reset(phydev);
 }
 
 static int ste10Xp_config_intr(struct phy_device *phydev)
