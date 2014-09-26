@@ -16,8 +16,11 @@
 #include <linux/module.h>
 #include <linux/io.h>
 #include <linux/delay.h>
+#include <linux/wait.h>
+#include <linux/interrupt.h>
 
 #include <linux/of.h>
+#include <linux/of_irq.h>
 #include <linux/of_platform.h>
 #include <linux/of_mdio.h>
 
@@ -38,9 +41,15 @@
 #define  MDIO_CLK_DIV_MASK	0x3F
 #define  MDIO_SUPP_PREAMBLE	(1 << 12)
 
+#define MDIO_OP_IN_PROGRESS	BIT(0)
+
 struct unimac_mdio_priv {
 	struct mii_bus		*mii_bus;
 	void __iomem		*base;
+	unsigned long		flags;
+	wait_queue_head_t	wq;
+	int			irq;
+	int			error_irq;
 };
 
 static inline void unimac_mdio_start(struct unimac_mdio_priv *priv)
@@ -50,6 +59,8 @@ static inline void unimac_mdio_start(struct unimac_mdio_priv *priv)
 	reg = __raw_readl(priv->base + MDIO_CMD);
 	reg |= MDIO_START_BUSY;
 	__raw_writel(reg, priv->base + MDIO_CMD);
+
+	set_bit(MDIO_OP_IN_PROGRESS, &priv->flags);
 }
 
 static inline unsigned int unimac_mdio_busy(struct unimac_mdio_priv *priv)
@@ -61,21 +72,30 @@ static int unimac_mdio_poll(struct unimac_mdio_priv *priv)
 {
 	unsigned int timeout = 1000;
 
-	do {
-		if (!unimac_mdio_busy(priv))
-			return 0;
+	if (priv->irq != -ENODEV) {
+		timeout = wait_event_timeout(priv->wq, !unimac_mdio_busy(priv),
+					     HZ / 100);
+		clear_bit(MDIO_OP_IN_PROGRESS, &priv->flags);
+	} else {
+		do {
+			if (!unimac_mdio_busy(priv))
+				return 0;
 
-		usleep_range(1000, 2000);
-	} while (timeout--);
+			usleep_range(1000, 2000);
+		} while (timeout--);
+	}
 
 	if (!timeout)
 		return -ETIMEDOUT;
+
+	return 0;
 }
 
 static int unimac_mdio_read(struct mii_bus *bus, int phy_id, int reg)
 {
 	struct unimac_mdio_priv *priv = bus->priv;
 	u32 cmd;
+	int ret;
 
 	/* Prepare the read operation */
 	cmd = MDIO_RD | (phy_id << MDIO_PMD_SHIFT) | (reg << MDIO_REG_SHIFT);
@@ -159,6 +179,73 @@ static int unimac_mdio_reset(struct mii_bus *bus)
 	return 0;
 }
 
+static irqreturn_t unimac_mdio_isr(int irq, void *dev_id)
+{
+	struct unimac_mdio_priv *priv = dev_id;
+
+	/* We use the MDIO_OP_IN_PROGRESS bit to indicate if a MDIO operation
+	 * is in progress. We need this because this interrupt handler might be
+	 * called in a shared mode with the interrupt handler of the Ethernet
+	 * MAC or switch and those will not handle MDIO interrupts on our
+	 * behalf.
+	 */
+	if (!test_bit(MDIO_OP_IN_PROGRESS, &priv->flags))
+		return IRQ_NONE;
+
+	wake_up(&priv->wq);
+
+	return IRQ_HANDLED;
+}
+
+static int unimac_mdio_intr_setup(struct platform_device *pdev,
+				  struct unimac_mdio_priv *priv)
+{
+	struct device_node *np = pdev->dev.of_node;
+	int ret;
+
+	/* We support 4 different hardware interrupt schemes:
+	 * - two separate interrupts: done and error interrupts
+	 * - shared interrupt with a parent device: GENET
+	 * - shared interrupt with a child of the parent: Starfighter 2 switch
+	 * - no interrupts at all: polling
+	 */
+	priv->irq = platform_get_irq(pdev, 0);
+	priv->error_irq = platform_get_irq(pdev, 1);
+
+	/* Dedicated two interrupts */
+	ret = devm_request_irq(&pdev->dev, priv->irq, unimac_mdio_isr, 0,
+				pdev->name, priv);
+	if (!ret) {
+		ret = devm_request_irq(&pdev->dev, priv->error_irq,
+					unimac_mdio_isr, 0, pdev->name, priv);
+		if (ret) {
+			dev_err(&pdev->dev, "missing MDIO_ERROR interrupt\n");
+			return ret;
+		}
+	}
+
+	/* Shared interrupt from the parent, e.g: GENET */
+	priv->irq = irq_of_parse_and_map(np->parent, 0);
+	ret = devm_request_irq(&pdev->dev, priv->irq, unimac_mdio_isr,
+			       IRQF_SHARED, pdev->name, priv);
+	if (!ret)
+		return ret;
+
+	/* Share interrupt from a child of the parent, e.g: Starfighter 2 */
+	priv->irq = irq_of_parse_and_map(np->parent->child, 0);
+	ret = devm_request_irq(&pdev->dev, priv->irq, unimac_mdio_isr,
+				IRQF_SHARED, pdev->name, priv);
+	if (!ret)
+		return ret;
+
+	/* Flag the interrupt as invalid so we will be busy looping until the
+	 * MDIO operation completes
+	 */
+	priv->irq = -ENODEV;
+
+	return 0;
+}
+
 static int unimac_mdio_probe(struct platform_device *pdev)
 {
 	struct unimac_mdio_priv *priv;
@@ -174,6 +261,12 @@ static int unimac_mdio_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+
+	ret = unimac_mdio_intr_setup(pdev, priv);
+	if (ret)
+		return ret;
+
+	init_waitqueue_head(&priv->wq);
 
 	/* Just ioremap, as this MDIO block is usually integrated into an
 	 * Ethernet MAC controller register range
@@ -203,7 +296,10 @@ static int unimac_mdio_probe(struct platform_device *pdev)
 		goto out_mdio_free;
 	}
 
-	ret = of_mdiobus_register(bus, np);
+	if (np)
+		ret = of_mdiobus_register(bus, np);
+	else
+		ret = mdiobus_register(bus);
 	if (ret) {
 		dev_err(&pdev->dev, "MDIO bus registration failed\n");
 		goto out_mdio_irq;
