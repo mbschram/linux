@@ -563,6 +563,10 @@ static irqreturn_t bcm_sf2_switch_0_isr(int irq, void *dev_id)
 				~priv->irq0_mask;
 	intrl2_0_writel(priv, priv->irq0_stat, INTRL2_CPU_CLEAR);
 
+	/* Shared interrupts with mdio-bcm-unimac, do not handle them */
+	if (priv->irq0_stat & (MDIO_ERR_IRQ | MDIO_DONE_IRQ))
+		return IRQ_NONE;
+
 	return IRQ_HANDLED;
 }
 
@@ -657,12 +661,18 @@ static int bcm_sf2_sw_setup(struct dsa_switch *ds)
 	/* Disable all interrupts and request them */
 	bcm_sf2_intr_disable(priv);
 
-	ret = request_irq(priv->irq0, bcm_sf2_switch_0_isr, 0,
+	ret = request_irq(priv->irq0, bcm_sf2_switch_0_isr, IRQF_SHARED,
 			  "switch_0", priv);
 	if (ret < 0) {
 		pr_err("failed to request switch_0 IRQ\n");
 		goto out_unmap;
 	}
+
+	/* Enable MDIO interrupts for the MDIO bus driver to handle them
+	 * in shared mode, do this early so PHY probing keeps working
+	 */
+	intrl2_0_writel(priv, MDIO_ERR_IRQ | MDIO_DONE_IRQ,
+			INTRL2_CPU_MASK_CLEAR);
 
 	ret = request_irq(priv->irq1, bcm_sf2_switch_1_isr, 0,
 			  "switch_1", priv);
@@ -731,6 +741,7 @@ static int bcm_sf2_sw_setup(struct dsa_switch *ds)
 	return 0;
 
 out_free_irq0:
+	intrl2_0_writel(priv, 0xffffffff, INTRL2_CPU_MASK_SET);
 	free_irq(priv->irq0, priv);
 out_unmap:
 	base = &priv->core;
@@ -985,6 +996,10 @@ static int bcm_sf2_sw_resume(struct dsa_switch *ds)
 		pr_err("%s: failed to software reset switch\n", __func__);
 		return ret;
 	}
+
+	/* Re-enable MDIO interrupts */
+	intrl2_0_writel(priv, MDIO_ERR_IRQ | MDIO_DONE_IRQ,
+			INTRL2_CPU_MASK_CLEAR);
 
 	if (priv->hw_params.num_gphy == 1)
 		bcm_sf2_gphy_enable_set(ds, true);
