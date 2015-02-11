@@ -38,7 +38,8 @@ obj-$(CONFIG_ARCH_BCM2835)	+= board_bcm2835.o
 obj-$(CONFIG_ARCH_BCM_5301X)	+= bcm_5301x.o
 
 # BCM63XXx
-obj-$(CONFIG_ARCH_BCM_63XX)	:= bcm63xx.o
+obj-$(CONFIG_ARCH_BCM_63XX)	:= bcm63xx.o \
+				   $(pwd)/../boot/dts/bcm963138dvt.dtb.o
 
 ifeq ($(CONFIG_ARCH_BRCMSTB),y)
 CFLAGS_platsmp-brcmstb.o	+= -march=armv7-a
