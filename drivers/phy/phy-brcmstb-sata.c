@@ -128,6 +128,7 @@ static struct phy_ops phy_ops_28nm = {
 };
 
 static const struct of_device_id brcm_sata_phy_of_match[] = {
+	{ .compatible	= "brcm,bcm63138-sata-phy" },
 	{ .compatible	= "brcm,bcm7445-sata-phy" },
 	{},
 };
