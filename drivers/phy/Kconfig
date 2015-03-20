@@ -311,7 +311,7 @@ config PHY_QCOM_UFS
 
 config PHY_BRCMSTB_SATA
 	tristate "Broadcom STB SATA PHY driver"
-	depends on ARCH_BRCMSTB
+	depends on ARCH_BRCMSTB || ARCH_BCM_63XX
 	depends on OF
 	select GENERIC_PHY
 	help
