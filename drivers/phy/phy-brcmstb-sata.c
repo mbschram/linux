@@ -224,6 +224,7 @@ static struct phy *brcm_sata_phy_xlate(struct device *dev,
 }
 
 static const struct of_device_id brcmstb_sata_phy_of_match[] = {
+	{ .compatible	= "brcm,bcm63138-sata-phy" },
 	{ .compatible	= "brcm,bcm7445-sata-phy" },
 	{},
 };
@@ -237,6 +238,13 @@ static int brcmstb_sata_phy_probe(struct platform_device *pdev)
 	struct resource *res;
 	struct phy_provider *provider;
 	int count = 0;
+
+#ifdef CONFIG_ARCH_BCM_63XX
+	if (bcm63xx_pmc_power_on_sata()) {
+		dev_err(dev, "failed to power on SATA!\n");
+		return -ENXIO;
+	}
+#endif
 
 	if (of_get_child_count(dn) == 0)
 		return -ENODEV;
