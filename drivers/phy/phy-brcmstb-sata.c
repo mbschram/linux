@@ -23,6 +23,7 @@
 #include <linux/of.h>
 #include <linux/phy/phy.h>
 #include <linux/platform_device.h>
+#include <linux/delay.h>
 
 #define SATA_MDIO_BANK_OFFSET				0x23c
 #define SATA_MDIO_REG_OFFSET(ofs)			((ofs) * 4)
@@ -50,6 +51,7 @@ struct brcm_sata_port {
 	struct phy *phy;
 	struct brcm_sata_phy *phy_priv;
 	bool ssc_en;
+	struct device_node *dn;
 };
 
 struct brcm_sata_phy {
@@ -97,6 +99,12 @@ static void brcm_sata_mdio_wr(void __iomem *addr, u32 bank, u32 ofs,
 	tmp = readl(addr + SATA_MDIO_REG_OFFSET(ofs));
 	tmp = (tmp & msk) | value;
 	writel(tmp, addr + SATA_MDIO_REG_OFFSET(ofs));
+}
+
+static u32 brcm_sata_mdio_rd(void __iomem *addr, u32 bank, u32 ofs)
+{
+	writel(bank, addr + SATA_MDIO_BANK_OFFSET);
+	return readl(addr + SATA_MDIO_REG_OFFSET(ofs));
 }
 
 /* These defaults were characterized by H/W group */
@@ -180,6 +188,55 @@ static void brcm_sata_phy_disable(struct brcm_sata_port *port)
 	writel(reg, p);
 }
 
+static void cfg_bcm63138_war(struct brcm_sata_port *port)
+{
+	void __iomem *base = sata_phy_get_phy_base(port);
+	unsigned int timeout = 1000;
+	u32 tmp;
+
+	tmp = 0x873;
+	brcm_sata_mdio_wr(base, 0x60, 0x87, 0, tmp);
+
+	tmp = 0xc000;
+	brcm_sata_mdio_wr(base, 0x60, 0x86, 0, tmp);
+
+	tmp = 0x3089;
+	brcm_sata_mdio_wr(base, 0x50, 0x81, 0, tmp);
+	udelay(1000);
+
+	tmp = 0x3088;
+	brcm_sata_mdio_wr(base, 0x50, 0x81, 0, tmp);
+	mdelay(1);
+
+	tmp = 0x3000;
+	brcm_sata_mdio_wr(base, 0xe0, 0x82, 0, tmp);
+
+	brcm_sata_mdio_wr(base, 0xe0, 0x86, 0, tmp);
+	mdelay(1);
+
+	tmp = 0x32;
+	brcm_sata_mdio_wr(base, 0x50, 0x83, 0, tmp);
+
+	tmp = 0xa;
+	brcm_sata_mdio_wr(base, 0x50, 0x84, 0, tmp);
+
+	tmp = 0x64;
+	brcm_sata_mdio_wr(base, 0x50, 0x86, 0, tmp);
+	mdelay(1);
+
+	/* Acquire PLL lock */
+	do {
+		tmp = brcm_sata_mdio_rd(base, 0, 0x81);
+		if (tmp & 0x1000)
+			break;
+
+		mdelay(1);
+	} while (timeout-- > 0);
+
+	if (!timeout)
+		pr_warn("%s: timed out reading from REG1\n", __func__);
+}
+
 static int brcmstb_sata_phy_power_on(struct phy *phy)
 {
 	struct brcm_sata_port *port = phy_get_drvdata(phy);
@@ -188,6 +245,8 @@ static int brcmstb_sata_phy_power_on(struct phy *phy)
 
 	brcm_sata_phy_enable(port);
 	cfg_ssc_28nm(port);
+
+	cfg_bcm63138_war(port);
 
 	return 0;
 }
@@ -238,13 +297,6 @@ static int brcmstb_sata_phy_probe(struct platform_device *pdev)
 	struct resource *res;
 	struct phy_provider *provider;
 	int count = 0;
-
-#ifdef CONFIG_ARCH_BCM_63XX
-	if (bcm63xx_pmc_power_on_sata()) {
-		dev_err(dev, "failed to power on SATA!\n");
-		return -ENXIO;
-	}
-#endif
 
 	if (of_get_child_count(dn) == 0)
 		return -ENODEV;
