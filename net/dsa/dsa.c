@@ -21,6 +21,7 @@
 #include <linux/of_mdio.h>
 #include <linux/of_platform.h>
 #include <linux/sysfs.h>
+#include <linux/etherdevice.h>
 #include "dsa_priv.h"
 
 char dsa_driver_version[] = "0.1";
@@ -589,20 +590,20 @@ static int dsa_of_probe(struct platform_device *pdev)
 	if (!mdio_bus)
 		return -EINVAL;
 
-	ethernet = of_parse_phandle(np, "dsa,ethernet", 0);
-	if (!ethernet)
-		return -EINVAL;
+	/*ethernet = of_parse_phandle(np, "dsa,ethernet", 0);*/
+	/*if (!ethernet)*/
+		/*return -EINVAL;*/
 
-	ethernet_dev = of_find_device_by_node(ethernet);
-	if (!ethernet_dev)
-		return -ENODEV;
+	/*ethernet_dev = of_find_device_by_node(ethernet);*/
+	/*if (!ethernet_dev)*/
+		/*return -ENODEV;*/
 
 	pd = kzalloc(sizeof(*pd), GFP_KERNEL);
 	if (!pd)
 		return -ENOMEM;
 
 	pdev->dev.platform_data = pd;
-	pd->netdev = &ethernet_dev->dev;
+	/*pd->netdev = &ethernet_dev->dev;*/
 	pd->nr_chips = of_get_available_child_count(np);
 	if (pd->nr_chips > DSA_MAX_SWITCHES)
 		pd->nr_chips = DSA_MAX_SWITCHES;
@@ -699,6 +700,25 @@ static inline void dsa_of_remove(struct platform_device *pdev)
 }
 #endif
 
+static int fake_ops_noop(struct net_device *dev)
+{
+	return 0;
+}
+
+static int fake_ops_xmit(struct sk_buff *skb, struct net_device *dev)
+{
+	dev->stats.tx_dropped++;
+	dev->stats.tx_errors++;
+
+	return NETDEV_TX_OK;
+}
+
+static struct net_device_ops fake_ops = {
+	.ndo_open	= fake_ops_noop,
+	.ndo_stop	= fake_ops_noop,
+	.ndo_start_xmit	= fake_ops_xmit,
+};
+
 static int dsa_probe(struct platform_device *pdev)
 {
 	struct dsa_platform_data *pd = pdev->dev.platform_data;
@@ -717,14 +737,26 @@ static int dsa_probe(struct platform_device *pdev)
 		pd = pdev->dev.platform_data;
 	}
 
-	if (pd == NULL || pd->netdev == NULL)
-		return -EINVAL;
+	/*if (pd == NULL || pd->netdev == NULL)*/
+		/*return -EINVAL;*/
 
-	dev = dev_to_net_device(pd->netdev);
-	if (dev == NULL) {
-		ret = -EINVAL;
+	dev = alloc_etherdev(0);
+	if (!dev) {
+		ret = -ENOMEM;
 		goto out;
 	}
+
+	SET_NETDEV_DEV(dev, &pdev->dev);
+	dev->netdev_ops = &fake_ops;
+	ret = register_netdev(dev);
+	if (ret)
+		goto out;
+
+	/*dev = dev_to_net_device(pd->netdev);*/
+	/*if (dev == NULL) {*/
+		/*ret = -EINVAL;*/
+		/*goto out;*/
+	/*}*/
 
 	if (dev->dsa_ptr != NULL) {
 		dev_put(dev);
@@ -868,6 +900,7 @@ static SIMPLE_DEV_PM_OPS(dsa_pm_ops, dsa_suspend, dsa_resume);
 
 static const struct of_device_id dsa_of_match_table[] = {
 	{ .compatible = "brcm,bcm7445-switch-v4.0" },
+	{ .compatible = "brcm,bcm63138-switch-v1.1" },
 	{ .compatible = "marvell,dsa", },
 	{}
 };
