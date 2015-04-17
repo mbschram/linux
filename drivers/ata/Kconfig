@@ -101,6 +101,8 @@ config SATA_AHCI_PLATFORM
 config SATA_BRCMSTB
 	tristate "Broadcom STB/DSL AHCI SATA support"
 	depends on ARCH_BRCMSTB || ARCH_BCM_63XX
+	select GENERIC_PHY
+	select PHY_BRCMSTB_SATA
 	help
 	  This option enables support for the AHCI SATA3 controller found on
 	  STB and DSL SoC's.
