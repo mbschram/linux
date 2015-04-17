@@ -26,6 +26,7 @@
 #include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/string.h>
+#include <linux/reset.h>
 
 #include "ahci.h"
 
@@ -45,6 +46,7 @@
 struct brcm_ahci_priv {
 	struct device *dev;
 	struct ahci_host_priv *hpriv;
+	struct reset_control *rcdev;
 
 	void __iomem *top_ctrl;
 };
@@ -104,6 +106,10 @@ static int brcm_ahci_probe(struct platform_device *pdev)
 	priv->top_ctrl = devm_ioremap_resource(dev, res);
 	if (IS_ERR(priv->top_ctrl))
 		return PTR_ERR(priv->top_ctrl);
+
+	priv->rcdev = of_reset_control_get(pdev->dev.of_node, NULL);
+	if (!IS_ERR(priv->rcdev))
+		reset_control_reset(priv->rcdev);
 
 	brcm_sata3_init_config(priv);
 
