@@ -123,6 +123,7 @@ config ARCH_BCM2835
 config ARCH_BCM_63XX
 	bool "Broadcom BCM63xx DSL SoC" if ARCH_MULTI_V7
 	depends on MMU
+	select ARCH_HAS_RESET_CONTROLLER
 	select ARM_ERRATA_754322
 	select ARM_ERRATA_764369 if SMP
 	select ARM_GIC
@@ -132,6 +133,7 @@ config ARCH_BCM_63XX
 	select HAVE_ARM_TWD if SMP
 	select HAVE_ARM_SCU if SMP
 	select HAVE_SMP
+	select RESET_CONTROLLER
 	help
 	  This enables support for systems based on Broadcom DSL SoCs.
 	  It currently supports the 'BCM63XX' ARM-based family, which includes
