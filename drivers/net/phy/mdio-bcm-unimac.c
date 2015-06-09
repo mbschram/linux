@@ -18,6 +18,7 @@
 #include <linux/delay.h>
 #include <linux/wait.h>
 #include <linux/interrupt.h>
+#include <linux/platform_data/mdio-bcm-unimac.h>
 
 #include <linux/of.h>
 #include <linux/of_irq.h>
@@ -248,6 +249,7 @@ static int unimac_mdio_intr_setup(struct platform_device *pdev,
 
 static int unimac_mdio_probe(struct platform_device *pdev)
 {
+	struct unimac_mdio_pdata *pdata = pdev->dev.platform_data;
 	struct unimac_mdio_priv *priv;
 	struct device_node *np;
 	struct mii_bus *bus;
@@ -288,6 +290,8 @@ static int unimac_mdio_probe(struct platform_device *pdev)
 	bus->read = unimac_mdio_read;
 	bus->write = unimac_mdio_write;
 	bus->reset = unimac_mdio_reset;
+	if (pdata)
+		bus->phy_mask = ~pdata->phy_mask;
 	snprintf(bus->id, MII_BUS_ID_SIZE, "%s", pdev->name);
 
 	bus->irq = kcalloc(PHY_MAX_ADDR, sizeof(int), GFP_KERNEL);
@@ -341,7 +345,7 @@ MODULE_DEVICE_TABLE(of, unimac_mdio_ids);
 
 static struct platform_driver unimac_mdio_driver = {
 	.driver = {
-		.name = "unimac-mdio",
+		.name = UNIMAC_MDIO_DRV_NAME,
 		.of_match_table = unimac_mdio_ids,
 	},
 	.probe	= unimac_mdio_probe,
@@ -352,4 +356,4 @@ module_platform_driver(unimac_mdio_driver);
 MODULE_AUTHOR("Broadcom Corporation");
 MODULE_DESCRIPTION("Broadcom UniMAC MDIO bus controller");
 MODULE_LICENSE("GPL");
-MODULE_ALIAS("platform:unimac-mdio");
+MODULE_ALIAS("platform:" UNIMAC_MDIO_DRV_NAME);
