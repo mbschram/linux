@@ -28,59 +28,6 @@
 
 #include "bcmgenet.h"
 
-/* read a value from the MII */
-static int bcmgenet_mii_read(struct mii_bus *bus, int phy_id, int location)
-{
-	int ret;
-	struct net_device *dev = bus->priv;
-	struct bcmgenet_priv *priv = netdev_priv(dev);
-	u32 reg;
-
-	bcmgenet_umac_writel(priv, (MDIO_RD | (phy_id << MDIO_PMD_SHIFT) |
-			     (location << MDIO_REG_SHIFT)), UMAC_MDIO_CMD);
-	/* Start MDIO transaction*/
-	reg = bcmgenet_umac_readl(priv, UMAC_MDIO_CMD);
-	reg |= MDIO_START_BUSY;
-	bcmgenet_umac_writel(priv, reg, UMAC_MDIO_CMD);
-	wait_event_timeout(priv->wq,
-			   !(bcmgenet_umac_readl(priv, UMAC_MDIO_CMD)
-			   & MDIO_START_BUSY),
-			   HZ / 100);
-	ret = bcmgenet_umac_readl(priv, UMAC_MDIO_CMD);
-
-	/* Some broken devices are known not to release the line during
-	 * turn-around, e.g: Broadcom BCM53125 external switches, so check for
-	 * that condition here and ignore the MDIO controller read failure
-	 * indication.
-	 */
-	if (!(bus->phy_ignore_ta_mask & 1 << phy_id) && (ret & MDIO_READ_FAIL))
-		return -EIO;
-
-	return ret & 0xffff;
-}
-
-/* write a value to the MII */
-static int bcmgenet_mii_write(struct mii_bus *bus, int phy_id,
-			      int location, u16 val)
-{
-	struct net_device *dev = bus->priv;
-	struct bcmgenet_priv *priv = netdev_priv(dev);
-	u32 reg;
-
-	bcmgenet_umac_writel(priv, (MDIO_WR | (phy_id << MDIO_PMD_SHIFT) |
-			     (location << MDIO_REG_SHIFT) | (0xffff & val)),
-			     UMAC_MDIO_CMD);
-	reg = bcmgenet_umac_readl(priv, UMAC_MDIO_CMD);
-	reg |= MDIO_START_BUSY;
-	bcmgenet_umac_writel(priv, reg, UMAC_MDIO_CMD);
-	wait_event_timeout(priv->wq,
-			   !(bcmgenet_umac_readl(priv, UMAC_MDIO_CMD) &
-			   MDIO_START_BUSY),
-			   HZ / 100);
-
-	return 0;
-}
-
 /* setup netdev link state when PHY link status change and
  * update UMAC and RGMII block when link up
  */
@@ -432,38 +379,6 @@ static int bcmgenet_mii_bus_reset(struct mii_bus *bus)
 			dev_dbg(&dev->dev, "Workaround for PHY @ %d\n", addr);
 			mdiobus_read(bus, addr, MII_BMSR);
 		}
-	}
-
-	return 0;
-}
-
-static int bcmgenet_mii_alloc(struct bcmgenet_priv *priv)
-{
-	struct mii_bus *bus;
-
-	if (priv->mii_bus)
-		return 0;
-
-	priv->mii_bus = mdiobus_alloc();
-	if (!priv->mii_bus) {
-		pr_err("failed to allocate\n");
-		return -ENOMEM;
-	}
-
-	bus = priv->mii_bus;
-	bus->priv = priv->dev;
-	bus->name = "bcmgenet MII bus";
-	bus->parent = &priv->pdev->dev;
-	bus->read = bcmgenet_mii_read;
-	bus->write = bcmgenet_mii_write;
-	bus->reset = bcmgenet_mii_bus_reset;
-	snprintf(bus->id, MII_BUS_ID_SIZE, "%s-%d",
-		 priv->pdev->name, priv->pdev->id);
-
-	bus->irq = kcalloc(PHY_MAX_ADDR, sizeof(int), GFP_KERNEL);
-	if (!bus->irq) {
-		mdiobus_free(priv->mii_bus);
-		return -ENOMEM;
 	}
 
 	return 0;

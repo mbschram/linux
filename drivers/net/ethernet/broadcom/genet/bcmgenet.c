@@ -2534,10 +2534,11 @@ static irqreturn_t bcmgenet_isr0(int irq, void *dev_id)
 		schedule_work(&priv->bcmgenet_irq_work);
 	}
 
+	/* MDIO interrupts are delegated to the MDIO controller driver */
 	if ((priv->hw_params->flags & GENET_HAS_MDIO_INTR) &&
 	    priv->irq0_stat & (UMAC_IRQ_MDIO_DONE | UMAC_IRQ_MDIO_ERROR)) {
 		priv->irq0_stat &= ~(UMAC_IRQ_MDIO_DONE | UMAC_IRQ_MDIO_ERROR);
-		wake_up(&priv->wq);
+		return IRQ_NONE;
 	}
 
 	return IRQ_HANDLED;
@@ -3402,8 +3403,6 @@ static int bcmgenet_probe(struct platform_device *pdev)
 
 	bcmgenet_set_hw_params(priv);
 
-	/* Mii wait queue */
-	init_waitqueue_head(&priv->wq);
 	/* Always use RX_BUF_LENGTH (2KB) buffer for all chips */
 	priv->rx_buf_len = RX_BUF_LENGTH;
 	INIT_WORK(&priv->bcmgenet_irq_work, bcmgenet_irq_task);
