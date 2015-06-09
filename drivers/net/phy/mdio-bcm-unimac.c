@@ -292,7 +292,7 @@ static int unimac_mdio_probe(struct platform_device *pdev)
 	bus->reset = unimac_mdio_reset;
 	if (pdata)
 		bus->phy_mask = ~pdata->phy_mask;
-	snprintf(bus->id, MII_BUS_ID_SIZE, "%s", pdev->name);
+	snprintf(bus->id, MII_BUS_ID_SIZE, "%s-%d", pdev->name, pdev->id);
 
 	bus->irq = kcalloc(PHY_MAX_ADDR, sizeof(int), GFP_KERNEL);
 	if (!bus->irq) {
