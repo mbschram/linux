@@ -305,6 +305,7 @@ static int brcm_ahci_remove(struct platform_device *pdev)
 
 static const struct of_device_id ahci_of_match[] = {
 	{.compatible = "brcm,bcm7445-ahci"},
+	{.compatible = "brcm,bcm63138-ahci"},
 	{},
 };
 MODULE_DEVICE_TABLE(of, ahci_of_match);
