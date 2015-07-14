@@ -1152,6 +1152,7 @@ __armv7_mmu_cache_flush:
 hierarchical:
 		mcr	p15, 0, r10, c7, c10, 5	@ DMB
 		stmfd	sp!, {r0-r7, r9-r11}
+ENTRY(__armv7_mmu_cache_flush_fn)
 		mrc	p15, 1, r0, c0, c0, 1	@ read clidr
 		ands	r3, r0, #0x7000000	@ extract loc from clidr
 		mov	r3, r3, lsr #23		@ left align loc bit field
@@ -1201,6 +1202,7 @@ iflush:
 		mcr	p15, 0, r10, c7, c10, 4	@ DSB
 		mcr	p15, 0, r10, c7, c5, 4	@ ISB
 		mov	pc, lr
+ENDPROC(__armv7_mmu_cache_flush_fn)
 
 __armv5tej_mmu_cache_flush:
 		tst	r4, #1
