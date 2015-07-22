@@ -469,6 +469,21 @@ static int bcmgenet_set_tx_csum(struct net_device *dev,
 	return 0;
 }
 
+static void bcmgenet_set_loopback(struct net_device *dev,
+				  netdev_features_t wanted)
+{
+	struct bcmgenet_priv *priv = netdev_priv(dev);
+	bool lbk_enable = !!(wanted & NETIF_F_LOOPBACK);
+	u32 reg;
+
+	reg = bcmgenet_umac_readl(priv, UMAC_CMD);
+	if (lbk_enable)
+		reg |= CMD_LCL_LOOP_EN;
+	else
+		reg &= ~CMD_LCL_LOOP_EN;
+	bcmgenet_umac_writel(priv, reg, UMAC_CMD);
+}
+
 static int bcmgenet_set_features(struct net_device *dev,
 				 netdev_features_t features)
 {
@@ -480,6 +495,8 @@ static int bcmgenet_set_features(struct net_device *dev,
 		ret = bcmgenet_set_tx_csum(dev, wanted);
 	if (changed & (NETIF_F_RXCSUM))
 		ret = bcmgenet_set_rx_csum(dev, wanted);
+	if (changed & NETIF_F_LOOPBACK)
+		bcmgenet_set_loopback(dev, wanted);
 
 	return ret;
 }
@@ -3191,7 +3208,7 @@ static int bcmgenet_probe(struct platform_device *pdev)
 
 	/* Set hardware features */
 	dev->hw_features |= NETIF_F_SG | NETIF_F_IP_CSUM |
-		NETIF_F_IPV6_CSUM | NETIF_F_RXCSUM;
+		NETIF_F_IPV6_CSUM | NETIF_F_RXCSUM | NETIF_F_LOOPBACK;
 
 	/* Request the WOL interrupt and advertise suspend if available */
 	priv->wol_irq_disabled = true;
