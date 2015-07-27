@@ -1069,11 +1069,20 @@ static unsigned int __bcmgenet_tx_reclaim(struct net_device *dev,
 
 	ring->free_bds += txbds_processed;
 	ring->c_index = (ring->c_index + txbds_processed) & DMA_C_INDEX_MASK;
+	/* Ensure writer completion for free_bds and reading completion for
+	 * c_index
+	 */
+	smp_mb();
 
 	if (ring->free_bds > (MAX_SKB_FRAGS + 1)) {
+		/* Ensure read completion of free_bds */
+		smp_mb();
 		txq = netdev_get_tx_queue(dev, ring->queue);
-		if (netif_tx_queue_stopped(txq))
+		if (netif_tx_queue_stopped(txq)) {
+			/* Make queue wake visible to xmit */
 			netif_tx_wake_queue(txq);
+			smp_mb();
+		}
 	}
 
 	return pkts_compl;
@@ -1083,11 +1092,8 @@ static unsigned int bcmgenet_tx_reclaim(struct net_device *dev,
 				struct bcmgenet_tx_ring *ring)
 {
 	unsigned int released;
-	unsigned long flags;
 
-	spin_lock_irqsave(&ring->lock, flags);
 	released = __bcmgenet_tx_reclaim(dev, ring);
-	spin_unlock_irqrestore(&ring->lock, flags);
 
 	return released;
 }
@@ -1277,7 +1283,6 @@ static netdev_tx_t bcmgenet_xmit(struct sk_buff *skb, struct net_device *dev)
 	struct bcmgenet_priv *priv = netdev_priv(dev);
 	struct bcmgenet_tx_ring *ring = NULL;
 	struct netdev_queue *txq;
-	unsigned long flags = 0;
 	int nr_frags, index;
 	u16 dma_desc_flags;
 	int ret;
@@ -1300,9 +1305,12 @@ static netdev_tx_t bcmgenet_xmit(struct sk_buff *skb, struct net_device *dev)
 	ring = &priv->tx_rings[index];
 	txq = netdev_get_tx_queue(dev, ring->queue);
 
-	spin_lock_irqsave(&ring->lock, flags);
+	/* Ensure read completion for free_bds */
+	smp_mb();
 	if (ring->free_bds <= nr_frags + 1) {
 		netif_tx_stop_queue(txq);
+		/* Make sure queue stopping is visible to tx reclaim */
+		smp_mb();
 		netdev_err(dev, "%s: tx ring %d full when queue %d awake\n",
 			   __func__, index, ring->queue);
 		ret = NETDEV_TX_BUSY;
@@ -1353,16 +1361,20 @@ static netdev_tx_t bcmgenet_xmit(struct sk_buff *skb, struct net_device *dev)
 	ring->prod_index += nr_frags + 1;
 	ring->prod_index &= DMA_P_INDEX_MASK;
 
-	if (ring->free_bds <= (MAX_SKB_FRAGS + 1))
+	/* Make free_bds decrement visible to tx_reclaim */
+	smp_mb();
+
+	if (ring->free_bds <= (MAX_SKB_FRAGS + 1)) {
 		netif_tx_stop_queue(txq);
+		/* Make tx queue stop visible to tx reclaim */
+		smp_mb();
+	}
 
 	if (!skb->xmit_more || netif_xmit_stopped(txq))
 		/* Packets are ready, update producer index */
 		bcmgenet_tdma_ring_writel(priv, ring->index,
 					  ring->prod_index, TDMA_PROD_INDEX);
 out:
-	spin_unlock_irqrestore(&ring->lock, flags);
-
 	return ret;
 }
 
@@ -1773,7 +1785,6 @@ static void bcmgenet_init_tx_ring(struct bcmgenet_priv *priv,
 	u32 words_per_bd = WORDS_PER_BD(priv);
 	u32 flow_period_val = 0;
 
-	spin_lock_init(&ring->lock);
 	ring->priv = priv;
 	ring->index = index;
 	if (index == DESC_INDEX) {
@@ -2770,7 +2781,6 @@ static void bcmgenet_dump_tx_queue(struct bcmgenet_tx_ring *ring)
 	u32 p_index, c_index, intsts, intmsk;
 	struct netdev_queue *txq;
 	unsigned int free_bds;
-	unsigned long flags;
 	bool txq_stopped;
 
 	if (!netif_msg_tx_err(priv))
@@ -2778,7 +2788,6 @@ static void bcmgenet_dump_tx_queue(struct bcmgenet_tx_ring *ring)
 
 	txq = netdev_get_tx_queue(priv->dev, ring->queue);
 
-	spin_lock_irqsave(&ring->lock, flags);
 	if (ring->index == DESC_INDEX) {
 		intsts = ~bcmgenet_intrl2_0_readl(priv, INTRL2_CPU_MASK_STATUS);
 		intmsk = UMAC_IRQ_TXDMA_DONE | UMAC_IRQ_TXDMA_MBDONE;
@@ -2789,8 +2798,8 @@ static void bcmgenet_dump_tx_queue(struct bcmgenet_tx_ring *ring)
 	c_index = bcmgenet_tdma_ring_readl(priv, ring->index, TDMA_CONS_INDEX);
 	p_index = bcmgenet_tdma_ring_readl(priv, ring->index, TDMA_PROD_INDEX);
 	txq_stopped = netif_tx_queue_stopped(txq);
+	smp_mb();
 	free_bds = ring->free_bds;
-	spin_unlock_irqrestore(&ring->lock, flags);
 
 	netif_err(priv, tx_err, priv->dev, "Ring %d queue %d status summary\n"
 		  "TX queue status: %s, interrupts: %s\n"
