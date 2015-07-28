@@ -62,7 +62,19 @@
 static struct sk_buff *brcm_tag_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct dsa_slave_priv *p = netdev_priv(dev);
+	struct net_device *master_dev = p->dp->ds->dst->master_netdev;
+	bool hw_accel = !!(master_dev->features & NETIF_F_HW_SWITCH_TAG_TX);
+	u32 port_mask;
 	u8 *brcm_tag;
+
+	/* Ethernet adapter takes care of inserting the proper Broadcom tag,
+	 * we still need to hand it the port mapping
+	 */
+	if (hw_accel) {
+		port_mask = 1 << p->dp->index;
+		dsa_copy_brcm_tag(skb, &port_mask);
+		goto out_xmit;
+	}
 
 	if (skb_cow_head(skb, BRCM_TAG_LEN) < 0)
 		goto out_free;
@@ -85,6 +97,7 @@ static struct sk_buff *brcm_tag_xmit(struct sk_buff *skb, struct net_device *dev
 		brcm_tag[2] = BRCM_IG_DSTMAP2_MASK;
 	brcm_tag[3] = (1 << p->dp->index) & BRCM_IG_DSTMAP1_MASK;
 
+out_xmit:
 	return skb;
 
 out_free:
