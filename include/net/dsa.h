@@ -43,6 +43,11 @@ enum dsa_tag_protocol {
 
 #define DSA_RTABLE_NONE		-1
 
+/* This tag length is 4 bytes, older ones were 6 bytes, we do not
+ * handle them
+ */
+#define BRCM_TAG_LEN	4
+
 struct dsa_chip_data {
 	/*
 	 * How to access the switch configuration registers.
@@ -504,5 +509,13 @@ static inline int dsa_switch_resume(struct dsa_switch *ds)
 	return 0;
 }
 #endif /* CONFIG_PM_SLEEP */
+
+#define DSA_BRCM_TAG_OFF	(sizeof(((struct sk_buff *)0)->cb) - BRCM_TAG_LEN)
+
+static inline void dsa_copy_brcm_tag(struct sk_buff *skb, const void *tag)
+{
+	memcpy(&skb->cb[DSA_BRCM_TAG_OFF], tag, BRCM_TAG_LEN);
+}
+
 
 #endif
