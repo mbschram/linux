@@ -3346,6 +3346,9 @@ static int addrconf_notify(struct notifier_block *this, unsigned long event,
 	int run_pending = 0;
 	int err;
 
+	if (dev->flags & IFF_NOIPV6)
+		goto out;
+
 	switch (event) {
 	case NETDEV_REGISTER:
 		if (!idev && dev->mtu >= IPV6_MIN_MTU) {
@@ -3516,6 +3519,7 @@ static int addrconf_notify(struct notifier_block *this, unsigned long event,
 		if (info->upper_dev && netif_is_l3_master(info->upper_dev))
 			addrconf_ifdown(dev, 0);
 	}
+out:
 
 	return NOTIFY_OK;
 }
