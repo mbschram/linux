@@ -1449,6 +1449,9 @@ static int inetdev_event(struct notifier_block *this, unsigned long event,
 	ASSERT_RTNL();
 
 	if (!in_dev) {
+		if (dev->flags & IFF_NOIPV4)
+			goto out;
+
 		if (event == NETDEV_REGISTER) {
 			in_dev = inetdev_init(dev);
 			if (IS_ERR(in_dev))
