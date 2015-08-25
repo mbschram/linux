@@ -62,6 +62,7 @@ static void bcm_sf2_imp_vlan_setup(struct dsa_switch *ds, int cpu_port)
 
 static void bcm_sf2_brcm_hdr_setup(struct bcm_sf2_priv *priv, int port)
 {
+	bool tagging = ds->ops->get_tag_protocol(ds) == DSA_TAG_PROTO_BRCM;
 	u32 reg, val;
 
 	/* Resolve which bit controls the Broadcom tag */
@@ -82,21 +83,30 @@ static void bcm_sf2_brcm_hdr_setup(struct bcm_sf2_priv *priv, int port)
 
 	/* Enable Broadcom tags for IMP port */
 	reg = core_readl(priv, CORE_BRCM_HDR_CTRL);
-	reg |= val;
+	if (tagging)
+		reg |= val;
+	else
+		reg &= ~val;
 	core_writel(priv, reg, CORE_BRCM_HDR_CTRL);
 
 	/* Enable reception Broadcom tag for CPU TX (switch RX) to
 	 * allow us to tag outgoing frames
 	 */
 	reg = core_readl(priv, CORE_BRCM_HDR_RX_DIS);
-	reg &= ~(1 << port);
+	if (tagging)
+		reg &= ~(1 << port);
+	else
+		reg |= 1 << port;
 	core_writel(priv, reg, CORE_BRCM_HDR_RX_DIS);
 
 	/* Enable transmission of Broadcom tags from the switch (CPU RX) to
 	 * allow delivering frames to the per-port net_devices
 	 */
 	reg = core_readl(priv, CORE_BRCM_HDR_TX_DIS);
-	reg &= ~(1 << port);
+	if (tagging)
+		reg &= ~(1 << port);
+	else
+		reg |= 1 << port;
 	core_writel(priv, reg, CORE_BRCM_HDR_TX_DIS);
 }
 
