@@ -48,6 +48,12 @@ static struct fixed_mdio_bus platform_fmb = {
 	.phys = LIST_HEAD_INIT(platform_fmb.phys),
 };
 
+struct device *platform_fmb_bus_get(void)
+{
+	return &platform_fmb.mii_bus->dev;
+}
+EXPORT_SYMBOL(platform_fmb_bus_get);
+
 static void fixed_phy_update(struct fixed_phy *fp)
 {
 	if (gpio_is_valid(fp->link_gpio))
