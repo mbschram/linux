@@ -20,8 +20,15 @@
 
 #include <asm/cpu-info.h>
 
-unsigned long PCIBIOS_MIN_IO;
-unsigned long PCIBIOS_MIN_MEM;
+/*
+ * If PCI_PROBE_ONLY in pci_flags is set, we don't change any PCI resource
+ * assignments.
+ */
+
+/*
+ * The PCI controller list.
+ */
+static LIST_HEAD(controllers);
 
 static int pci_initialized;
 
@@ -71,6 +78,9 @@ static void pcibios_scanbus(struct pci_controller *hose)
 	static int need_domain_info;
 	LIST_HEAD(resources);
 	struct pci_bus *bus;
+
+	if (!hose->iommu)
+		PCI_DMA_BUS_IS_PHYS = 1;
 
 	if (hose->get_busno && pci_has_flag(PCI_PROBE_ONLY))
 		next_busno = (*hose->get_busno)();
@@ -197,52 +207,92 @@ void register_pci_controller(struct pci_controller *hose)
 	}
 
 	return;
+
+out:
+	printk(KERN_WARNING
+	       "Skipping PCI bus scan due to resource conflict\n");
 }
-EXPORT_SYMBOL(PCIBIOS_MIN_IO);
-EXPORT_SYMBOL(PCIBIOS_MIN_MEM);
 
-static int __init pcibios_set_cache_line_size(void)
+static int __init pcibios_init(void)
 {
-	struct cpuinfo_mips *c = &current_cpu_data;
-	unsigned int lsize;
+	struct pci_controller *hose;
 
-	/*
-	 * Set PCI cacheline size to that of the highest level in the
-	 * cache hierarchy.
-	 */
-	lsize = c->dcache.linesz;
-	lsize = c->scache.linesz ? : lsize;
-	lsize = c->tcache.linesz ? : lsize;
+	/* Scan all of the recorded PCI controllers.  */
+	list_for_each_entry(hose, &controllers, list)
+		pcibios_scanbus(hose);
 
-	BUG_ON(!lsize);
+	pci_fixup_irqs(pci_common_swizzle, pcibios_map_irq);
 
-	pci_dfl_cache_line_size = lsize >> 2;
+	pci_initialized = 1;
 
-	pr_debug("PCI: pci_cache_line_size set to %d bytes\n", lsize);
 	return 0;
 }
-arch_initcall(pcibios_set_cache_line_size);
 
-int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
-			enum pci_mmap_state mmap_state, int write_combine)
+subsys_initcall(pcibios_init);
+
+static int pcibios_enable_resources(struct pci_dev *dev, int mask)
 {
-	unsigned long prot;
+	u16 cmd, old_cmd;
+	int idx;
+	struct resource *r;
 
-	/*
-	 * I/O space can be accessed via normal processor loads and stores on
-	 * this platform but for now we elect not to do this and portable
-	 * drivers should not do this anyway.
-	 */
-	if (mmap_state == pci_mmap_io)
-		return -EINVAL;
+	pci_read_config_word(dev, PCI_COMMAND, &cmd);
+	old_cmd = cmd;
+	for (idx=0; idx < PCI_NUM_RESOURCES; idx++) {
+		/* Only set up the requested stuff */
+		if (!(mask & (1<<idx)))
+			continue;
 
-	/*
-	 * Ignore write-combine; for now only return uncached mappings.
-	 */
-	prot = pgprot_val(vma->vm_page_prot);
-	prot = (prot & ~_CACHE_MASK) | _CACHE_UNCACHED;
-	vma->vm_page_prot = __pgprot(prot);
+		r = &dev->resource[idx];
+		if (!(r->flags & (IORESOURCE_IO | IORESOURCE_MEM)))
+			continue;
+		if ((idx == PCI_ROM_RESOURCE) &&
+				(!(r->flags & IORESOURCE_ROM_ENABLE)))
+			continue;
+		if (!r->start && r->end) {
+			printk(KERN_ERR "PCI: Device %s not available "
+			       "because of resource collisions\n",
+			       pci_name(dev));
+			return -EINVAL;
+		}
+		if (r->flags & IORESOURCE_IO)
+			cmd |= PCI_COMMAND_IO;
+		if (r->flags & IORESOURCE_MEM)
+			cmd |= PCI_COMMAND_MEMORY;
+	}
+	if (cmd != old_cmd) {
+		printk("PCI: Enabling device %s (%04x -> %04x)\n",
+		       pci_name(dev), old_cmd, cmd);
+		pci_write_config_word(dev, PCI_COMMAND, cmd);
+	}
+	return 0;
+}
 
-	return remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
-		vma->vm_end - vma->vm_start, vma->vm_page_prot);
+int pcibios_enable_device(struct pci_dev *dev, int mask)
+{
+	int err;
+
+	if ((err = pcibios_enable_resources(dev, mask)) < 0)
+		return err;
+
+	return pcibios_plat_dev_init(dev);
+}
+
+void pcibios_fixup_bus(struct pci_bus *bus)
+{
+	struct pci_dev *dev = bus->self;
+
+	if (pci_has_flag(PCI_PROBE_ONLY) && dev &&
+	    (dev->class >> 8) == PCI_CLASS_BRIDGE_PCI) {
+		pci_read_bridge_bases(bus);
+	}
+}
+
+char * (*pcibios_plat_setup)(char *str) __initdata;
+
+char *__init pcibios_setup(char *str)
+{
+	if (pcibios_plat_setup)
+		return pcibios_plat_setup(str);
+	return str;
 }
