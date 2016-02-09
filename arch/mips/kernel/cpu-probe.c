@@ -17,6 +17,7 @@
 #include <linux/smp.h>
 #include <linux/stddef.h>
 #include <linux/export.h>
+#include <linux/debugfs.h>
 
 #include <asm/bugs.h>
 #include <asm/cpu.h>
@@ -1719,3 +1720,22 @@ void cpu_report(void)
 	if (cpu_has_msa)
 		pr_info("MSA revision is: %08x\n", c->msa_id);
 }
+
+#ifdef CONFIG_DEBUG_FS
+extern struct dentry *mips_debugfs_dir;
+static int __init debugfs_cpu_options(void)
+{
+	struct dentry *d;
+
+	if (!mips_debugfs_dir)
+		return -ENODEV;
+
+	d = debugfs_create_x64("cpu_options", S_IRUGO,
+			       mips_debugfs_dir, &current_cpu_data.options);
+	if (!d)
+		return -ENOMEM;
+
+	return 0;
+}
+__initcall(debugfs_cpu_options);
+#endif
