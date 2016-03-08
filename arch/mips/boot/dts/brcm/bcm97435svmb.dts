@@ -94,3 +94,7 @@
 &sata_phy {
 	status = "okay";
 };
+
+&pcie {
+	status = "okay";
+};
