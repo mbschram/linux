@@ -58,3 +58,7 @@
 &ohci3 {
 	status = "okay";
 };
+
+&pcie {
+	status = "okay";
+};
