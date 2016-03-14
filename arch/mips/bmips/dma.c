@@ -40,7 +40,7 @@ static struct bmips_dma_range *bmips_dma_ranges;
 
 #define FLUSH_RAC		0x100
 
-static dma_addr_t bmips_phys_to_dma(struct device *dev, phys_addr_t pa)
+static dma_addr_t bmips_ubus_phys_to_dma(struct device *dev, phys_addr_t pa)
 {
 	struct bmips_dma_range *r;
 
@@ -50,6 +50,24 @@ static dma_addr_t bmips_phys_to_dma(struct device *dev, phys_addr_t pa)
 			return pa - r->child_addr + r->parent_addr;
 	}
 	return pa;
+}
+
+static unsigned long bmips_ubus_dma_addr_to_phys(struct device *dev,
+						 dma_addr_t dma_addr)
+{
+	struct bmips_dma_range *r;
+
+	for (r = bmips_dma_ranges; r && r->size; r++) {
+		if (dma_addr >= r->parent_addr &&
+		    dma_addr < (r->parent_addr + r->size))
+			return dma_addr - r->parent_addr + r->child_addr;
+	}
+	return dma_addr;
+}
+
+static dma_addr_t bmips_phys_to_dma(struct device *dev, phys_addr_t pa)
+{
+	return bmips_ubus_phys_to_dma(dev, pa);
 }
 
 dma_addr_t plat_map_dma_mem(struct device *dev, void *addr, size_t size)
@@ -64,14 +82,7 @@ dma_addr_t plat_map_dma_mem_page(struct device *dev, struct page *page)
 
 unsigned long plat_dma_addr_to_phys(struct device *dev, dma_addr_t dma_addr)
 {
-	struct bmips_dma_range *r;
-
-	for (r = bmips_dma_ranges; r && r->size; r++) {
-		if (dma_addr >= r->parent_addr &&
-		    dma_addr < (r->parent_addr + r->size))
-			return dma_addr - r->parent_addr + r->child_addr;
-	}
-	return dma_addr;
+	return bmips_ubus_dma_addr_to_phys(dev, dma_addr);
 }
 
 static int __init bmips_init_dma_ranges(void)
