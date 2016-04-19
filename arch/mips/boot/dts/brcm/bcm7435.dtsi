@@ -55,7 +55,7 @@
 	};
 
 	pcie: pcie@10410000 {
-		reg = <0x10410000 0xc024>;
+		reg = <0x10410000 0x930c>;
 		interrupts = <0x27>, <0x27>;
 		interrupt-names = "pcie", "msi";
 		interrupt-parent = <&periph_intc>;
