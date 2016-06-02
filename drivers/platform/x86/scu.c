@@ -25,7 +25,7 @@
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/leds.h>
-#include <linux/mdio-gpio.h>
+#include <linux/platform_data/mdio-gpio.h>
 #include <linux/platform_device.h>
 #include <linux/gpio.h>
 #include <linux/err.h>
@@ -41,6 +41,7 @@
 #include <linux/seq_file.h>
 #include <linux/netdevice.h>
 #include <linux/rtnetlink.h>
+#include <linux/nvmem-consumer.h>
 #include <net/dsa.h>
 #include <asm/processor.h>
 #include <asm/byteorder.h>
@@ -130,8 +131,8 @@ struct scu_data {
 	struct spi_device *spidev[1];		/* SPI devices */
 	const struct scu_platform_data *pdata;
 	bool have_write_magic;
-	struct memory_accessor *macc;
 	struct eeprom_data eeprom;
+	struct nvmem_device *nvmem;
 	bool eeprom_accessible;
 	bool eeprom_valid;
 };
@@ -168,9 +169,10 @@ static int scu_update_checksum(struct scu_data *data)
 	checksum = scu_get_checksum((unsigned char *)&data->eeprom,
 				    data->pdata->eeprom_len);
 	data->eeprom.checksum = ~checksum + 1;
-	ret = data->macc->write(data->macc, &data->eeprom.checksum,
+	ret = nvmem_device_write(data->nvmem,
 			0x300 + offsetof(struct eeprom_data, checksum),
-			sizeof(data->eeprom.checksum));
+			sizeof(data->eeprom.checksum),
+			&data->eeprom.checksum);
 	if (ret <= 0)
 		return ret < 0 ? ret : -EIO;
 	return 0;
@@ -244,7 +246,7 @@ static ssize_t scu_object_store(struct scu_data *data, int offset,
 		out = (char *)&data->eeprom;
 	}
 
-	ret = data->macc->write(data->macc, out, 0x300 + offset, len);
+	ret = nvmem_device_write(data->nvmem, 0x300 + offset, len, out);
 	if (ret <= 0) {
 		data->eeprom_valid = false;
 		if (ret == 0)
@@ -592,7 +594,7 @@ static ssize_t scu_eeprom_test_scratchpad_read(struct file *filp,
 	if (off + count >= SCU_EEPROM_TEST_SCRATCHPAD_SIZE)
 		count = SCU_EEPROM_TEST_SCRATCHPAD_SIZE - off;
 
-	return data->macc->read(data->macc, buf, off, count);
+	return nvmem_device_read(data->nvmem, off, count, buf);
 }
 
 static ssize_t scu_eeprom_test_scratchpad_write(struct file *filp,
@@ -613,7 +615,7 @@ static ssize_t scu_eeprom_test_scratchpad_write(struct file *filp,
 	if (off + count >= SCU_EEPROM_TEST_SCRATCHPAD_SIZE)
 		count = SCU_EEPROM_TEST_SCRATCHPAD_SIZE - off;
 
-	return data->macc->write(data->macc, buf, off, count);
+	return nvmem_device_write(data->nvmem, off, count, buf);
 }
 
 /* base offset for 32 byte "eeprom_test_scratchpad" file is 0 */
@@ -1064,8 +1066,6 @@ static struct dsa_chip_data switch_chip_data = {
         .port_names[3]	= "port3",
         .port_names[4]	= "host2esb",
         .port_names[5]	= 0,	/* unused */
-	.flags		= DSA_CREATE_CPU_IF,
-	// .flags		= DSA_IS_UNMANAGED | DSA_CREATE_CPU_IF,
 };
 
 static void scu_setup_ethernet_switch(struct scu_data *data)
@@ -1207,7 +1207,7 @@ static int scu_instantiate_spi(struct scu_data *data,
 	return 0;
 }
 
-static void populate_unit_info(struct memory_accessor *mem_accessor,
+static void populate_unit_info(struct nvmem_device *nvmem,
 			       void *context);
 
 static struct at24_platform_data at24c08 = {
@@ -1235,7 +1235,7 @@ static struct i2c_board_info scu_i2c_info_common[] = {
  * struct memory_accessor. It then calls part_number_proc, serial_number_proc,
  * and dom_proc to populate the procfs entries for each specific field.
  */
-static void populate_unit_info(struct memory_accessor *mem_accessor,
+static void populate_unit_info(struct nvmem_device *nvmem,
 			       void *context)
 {
 	const struct scu_platform_data *pdata = &scu_platform_data[unknown];
@@ -1243,12 +1243,11 @@ static void populate_unit_info(struct memory_accessor *mem_accessor,
 	unsigned char *ptr;
 	int i, len;
 
-	data->macc = mem_accessor;
+	data->nvmem = nvmem;
 
 	ptr = (unsigned char *)&data->eeprom;
 	/* Read Data structure from EEPROM */
-	if (mem_accessor->read(mem_accessor, ptr, 0x300,
-			       sizeof(data->eeprom)) <= 0) {
+	if (nvmem_device_read(nvmem, 0x300, sizeof(data->eeprom), ptr) <= 0) {
 		dev_err(data->dev, "Failed to read eeprom data\n");
 		goto error;
 	}
