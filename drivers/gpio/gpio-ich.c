@@ -669,7 +669,6 @@ add_err:
 irq_err:
 	destroy_workqueue(ichx_priv.workqueue);
 wq_err:
-	ichx_gpio_release_regions(ichx_priv.gpio_base, ichx_priv.use_gpio);
 	if (ichx_priv.pm_base)
 		release_region(ichx_priv.pm_base->start,
 				resource_size(ichx_priv.pm_base));
@@ -684,7 +683,6 @@ static int ichx_gpio_remove(struct platform_device *pdev)
 	cancel_delayed_work_sync(&ichx_priv.work);
 	destroy_workqueue(ichx_priv.workqueue);
 
-	ichx_gpio_release_regions(ichx_priv.gpio_base, ichx_priv.use_gpio);
 	if (ichx_priv.pm_base)
 		release_region(ichx_priv.pm_base->start,
 				resource_size(ichx_priv.pm_base));
