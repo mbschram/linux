@@ -369,6 +369,7 @@ struct dsa_switch_driver {
 void register_switch_driver(struct dsa_switch_driver *type);
 void unregister_switch_driver(struct dsa_switch_driver *type);
 struct mii_bus *dsa_host_dev_to_mii_bus(struct device *dev);
+struct net_device *dev_to_net_device(struct device *dev);
 
 static inline void *ds_to_priv(struct dsa_switch *ds)
 {
