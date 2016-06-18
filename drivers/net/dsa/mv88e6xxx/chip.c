@@ -3776,8 +3776,7 @@ static struct dsa_switch_ops mv88e6xxx_switch_ops = {
 	.port_mdb_dump          = mv88e6xxx_port_mdb_dump,
 };
 
-static int mv88e6xxx_register_switch(struct mv88e6xxx_chip *chip,
-				     struct device_node *np)
+static int mv88e6xxx_register_switch(struct mv88e6xxx_chip *chip)
 {
 	struct device *dev = chip->dev;
 	struct dsa_switch *ds;
@@ -3792,7 +3791,7 @@ static int mv88e6xxx_register_switch(struct mv88e6xxx_chip *chip,
 
 	dev_set_drvdata(dev, ds);
 
-	return dsa_register_switch(ds, np);
+	return dsa_register_switch(ds, dev);
 }
 
 static void mv88e6xxx_unregister_switch(struct mv88e6xxx_chip *chip)
@@ -3841,7 +3840,7 @@ static int mv88e6xxx_probe(struct mdio_device *mdiodev)
 	if (err)
 		return err;
 
-	err = mv88e6xxx_register_switch(chip, np);
+	err = mv88e6xxx_register_switch(chip);
 	if (err) {
 		mv88e6xxx_mdio_unregister(chip);
 		return err;
