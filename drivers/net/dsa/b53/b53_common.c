@@ -1771,6 +1771,7 @@ int b53_switch_register(struct b53_device *dev)
 	if (dev->pdata) {
 		dev->chip_id = dev->pdata->chip_id;
 		dev->enabled_ports = dev->pdata->enabled_ports;
+		dev->ds->dev->platform_data = &dev->pdata->dsa_pd;
 	}
 
 	if (!dev->chip_id && b53_switch_detect(dev))
