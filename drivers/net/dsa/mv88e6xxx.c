@@ -3834,8 +3834,7 @@ static struct dsa_switch_driver mv88e6xxx_switch_driver = {
 	.port_fdb_dump          = mv88e6xxx_port_fdb_dump,
 };
 
-static int mv88e6xxx_register_switch(struct mv88e6xxx_priv_state *ps,
-				     struct device_node *np)
+static int mv88e6xxx_register_switch(struct mv88e6xxx_priv_state *ps)
 {
 	struct device *dev = ps->dev;
 	struct dsa_switch *ds;
@@ -3850,7 +3849,7 @@ static int mv88e6xxx_register_switch(struct mv88e6xxx_priv_state *ps,
 
 	dev_set_drvdata(dev, ds);
 
-	return dsa_register_switch(ds, np);
+	return dsa_register_switch(ds, dev);
 }
 
 static void mv88e6xxx_unregister_switch(struct mv88e6xxx_priv_state *ps)
@@ -3897,7 +3896,7 @@ static int mv88e6xxx_probe(struct mdio_device *mdiodev)
 	if (err)
 		return err;
 
-	err = mv88e6xxx_register_switch(ps, np);
+	err = mv88e6xxx_register_switch(ps);
 	if (err) {
 		mv88e6xxx_mdio_unregister(ps);
 		return err;
