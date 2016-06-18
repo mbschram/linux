@@ -35,6 +35,7 @@
 #include <linux/version.h>
 #include <linux/platform_data/at24.h>
 #include <linux/platform_data/pca953x.h>
+#include <linux/platform_data/b53.h>
 #include <linux/sysfs.h>
 #include <linux/spi/spi.h>
 #include <linux/proc_fs.h>
@@ -1105,6 +1106,29 @@ static struct i2c_board_info scu_i2c_info_scu2[] = {
 		.platform_data = &scu_pca953x_pdata[0],},
 };
 
+static struct dsa_chip_data b53_switch_chip_data = {
+	.port_names[0]  = "lan1",
+	.port_names[1]  = "lan2",
+	.port_names[2]  = "lan3",
+	.port_names[3]  = "lan4",
+	.port_names[4]  = "cpu",
+};
+
+static struct b53_platform_data b53_switch_pdata = {
+	.enabled_ports	= 0x1f,
+	.dsa_pd		= {
+		.nr_chips = 1,
+		/* netdev is filled at runtime */
+		.chip   = &b53_switch_chip_data,
+	},
+};
+
+static void scu_b53_switch_init(struct scu_data *data)
+{
+	if (data->netdev)
+		b53_switch_pdata.dsa_pd.netdev = &data->netdev->dev;
+}
+
 static struct spi_board_info scu_spi_info[] = {
 	{
 #ifdef TESTING
@@ -1114,11 +1138,12 @@ static struct spi_board_info scu_spi_info[] = {
 	 .max_speed_hz = 1000000,
 	 .mode = SPI_MODE_0,
 #else
-	 .modalias = "robodebug",
+	 .modalias = "b53-switch",
 	 .bus_num = 0,
 	 .chip_select = 0,
 	 .max_speed_hz = 2000000,
 	 .mode = SPI_MODE_3,
+	 .platform_data = &b53_switch_pdata,
 #endif
 	},
 };
@@ -1133,6 +1158,7 @@ static struct scu_platform_data scu_platform_data[] = {
 		.num_i2c_board_info = ARRAY_SIZE(scu_i2c_info_scu2),
 		.spi_board_info = scu_spi_info,
 		.num_spi_board_info = ARRAY_SIZE(scu_spi_info),
+		.init = scu_b53_switch_init,
 	},
 	[scu2] = {
 		.board_type = "SCU2 x86",
