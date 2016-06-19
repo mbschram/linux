@@ -86,6 +86,7 @@ struct dsa_platform_data {
 };
 
 struct packet_type;
+struct dsa2_platform_data;
 
 struct dsa_switch_tree {
 	struct list_head	list;
@@ -104,6 +105,7 @@ struct dsa_switch_tree {
 	 * this dsa switch tree instance.
 	 */
 	struct dsa_platform_data	*pd;
+	struct dsa2_platform_data	*pd2;
 
 	/*
 	 * Reference to network device to use, and which tagging
@@ -139,11 +141,16 @@ struct dsa_switch_tree {
 	const struct dsa_device_ops *tag_ops;
 };
 
+struct dsa2_port_data;
+
 struct dsa_port {
+	const char		*name;
 	struct net_device	*netdev;
+	struct phy_device	*phydev;
 	struct device_node	*dn;
 	unsigned int		ageing_time;
 	u8			stp_state;
+	struct dsa2_port_data	*data;
 };
 
 struct dsa_switch {

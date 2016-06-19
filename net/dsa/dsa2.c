@@ -18,6 +18,7 @@
 #include <net/dsa.h>
 #include <linux/of.h>
 #include <linux/of_net.h>
+#include <linux/platform_data/dsa.h>
 #include "dsa_priv.h"
 
 static LIST_HEAD(dsa_switch_trees);
@@ -81,14 +82,15 @@ static void dsa_dst_del_ds(struct dsa_switch_tree *dst,
 
 static bool dsa_port_is_valid(struct dsa_port *port)
 {
-	return !!port->dn;
+	return !!(port->dn || port->name);
 }
 
 static bool dsa_port_is_dsa(struct dsa_port *port)
 {
-	const char *name;
+	const char *name = port->name;
 
-	name = of_get_property(port->dn, "label", NULL);
+	if (port->dn)
+		name = of_get_property(port->dn, "label", NULL);
 	if (!name)
 		return false;
 
@@ -100,9 +102,10 @@ static bool dsa_port_is_dsa(struct dsa_port *port)
 
 static bool dsa_port_is_cpu(struct dsa_port *port)
 {
-	const char *name;
+	const char *name = port->name;
 
-	name = of_get_property(port->dn, "label", NULL);
+	if (port->dn)
+		name = of_get_property(port->dn, "label", NULL);
 	if (!name)
 		return false;
 
@@ -141,22 +144,54 @@ static struct dsa_switch *dsa_dst_find_port_dn(struct dsa_switch_tree *dst,
 	return NULL;
 }
 
+static struct dsa_switch *dsa_dst_find_port(struct dsa_switch_tree *dst,
+					    struct dsa2_port_link *link)
+{
+	struct dsa_switch *ds;
+	unsigned int port;
+	u32 index;
+
+	for (index = 0; index < DSA_MAX_SWITCHES; index++) {
+		ds = dst->ds[index];
+		if (!ds)
+			continue;
+
+		if (link->index != index)
+			continue;
+
+		for (port = 0; port < DSA_MAX_PORTS; port++)
+			if (link->port == port)
+				return ds;
+	}
+
+	return NULL;
+}
+
 static int dsa_port_complete(struct dsa_switch_tree *dst,
 			     struct dsa_switch *src_ds,
 			     struct dsa_port *port,
 			     u32 src_port)
 {
 	struct device_node *link;
+	struct dsa2_port_link *plink;
 	int index;
 	struct dsa_switch *dst_ds;
 
 	for (index = 0;; index++) {
-		link = of_parse_phandle(port->dn, "link", index);
-		if (!link)
-			break;
+		if (port->dn) {
+			link = of_parse_phandle(port->dn, "link", index);
+			if (!link)
+				break;
 
-		dst_ds = dsa_dst_find_port_dn(dst, link);
-		of_node_put(link);
+			dst_ds = dsa_dst_find_port_dn(dst, link);
+			of_node_put(link);
+		} else {
+			plink = &port->data->links[index];
+			if (!plink->valid)
+				break;
+
+			dst_ds = dsa_dst_find_port(dst, &port->data->links[index]);
+		}
 
 		if (!dst_ds)
 			return 1;
@@ -269,10 +304,11 @@ static void dsa_cpu_port_unapply(struct dsa_port *port, u32 index,
 static int dsa_user_port_apply(struct dsa_port *port, u32 index,
 			       struct dsa_switch *ds)
 {
-	const char *name;
+	const char *name = port->name;
 	int err;
 
-	name = of_get_property(port->dn, "label", NULL);
+	if (port->dn)
+		name = of_get_property(port->dn, "label", NULL);
 
 	err = dsa_slave_create(ds, ds->dev, index, name);
 	if (err) {
@@ -452,11 +488,14 @@ static int dsa_cpu_parse(struct dsa_port *port, u32 index,
 	struct net_device *ethernet_dev;
 	struct device_node *ethernet;
 
-	ethernet = of_parse_phandle(port->dn, "ethernet", 0);
-	if (!ethernet)
-		return -EINVAL;
+	if (port->dn) {
+		ethernet = of_parse_phandle(port->dn, "ethernet", 0);
+		if (!ethernet)
+			return -EINVAL;
+		ethernet_dev = of_find_net_device_by_node(ethernet);
+	} else
+		ethernet_dev = dev_to_net_device(dst->pd2->netdev);
 
-	ethernet_dev = of_find_net_device_by_node(ethernet);
 	if (!ethernet_dev)
 		return -EPROBE_DEFER;
 
@@ -559,6 +598,37 @@ static int dsa_parse_ports_dn(struct device_node *ports, struct dsa_switch *ds)
 	return 0;
 }
 
+static int dsa_parse_ports(struct dsa2_platform_data *pdata, struct dsa_switch *ds)
+{
+	struct dsa2_port_data *port;
+	bool valid_name_found = false;
+	unsigned int i;
+
+	for (i = 0; i < DSA_MAX_PORTS; i++) {
+		port = &pdata->ports[i];
+
+		if (!port->name)
+			continue;
+
+		ds->ports[i].name = port->name;
+		ds->ports[i].data = port;
+
+		/* Initialize enabled_port_mask now for drv->setup()
+		 * to have access to a correct value, just like what
+		 * net/dsa/dsa.c::dsa_switch_setup_one does.
+		 */
+		if (!dsa_port_is_cpu(&ds->ports[i]))
+			ds->enabled_port_mask |= 1 << i;
+
+		valid_name_found= true;
+	}
+
+	if (!valid_name_found && i == DSA_MAX_PORTS)
+		return -EINVAL;
+
+	return 0;
+}
+
 static int dsa_parse_member_dn(struct device_node *np, u32 *tree, u32 *index)
 {
 	int err;
@@ -583,6 +653,19 @@ static int dsa_parse_member_dn(struct device_node *np, u32 *tree, u32 *index)
 	return 0;
 }
 
+static int dsa_parse_member(struct dsa2_platform_data *pd, u32 *tree, u32 *index)
+{
+	*tree = *index = 0;
+
+	if (pd->index >= DSA_MAX_SWITCHES)
+		return -EINVAL;
+
+	*tree = pd->tree;
+	*index = pd->index;
+
+	return 0;
+}
+
 static struct device_node *dsa_get_ports(struct dsa_switch *ds,
 					 struct device_node *np)
 {
@@ -599,23 +682,34 @@ static struct device_node *dsa_get_ports(struct dsa_switch *ds,
 
 static int _dsa_register_switch(struct dsa_switch *ds, struct device *dev)
 {
+	struct dsa2_platform_data *pdata = dev->platform_data;
 	struct device_node *np = dev->of_node;
 	struct dsa_switch_tree *dst;
 	struct device_node *ports;
 	u32 tree, index;
 	int i, err;
 
-	err = dsa_parse_member_dn(np, &tree, &index);
-	if (err)
-		return err;
+	if (np) {
+		err = dsa_parse_member_dn(np, &tree, &index);
+		if (err)
+			return err;
 
-	ports = dsa_get_ports(ds, np);
-	if (IS_ERR(ports))
-		return PTR_ERR(ports);
+		ports = dsa_get_ports(ds, np);
+		if (IS_ERR(ports))
+			return PTR_ERR(ports);
 
-	err = dsa_parse_ports_dn(ports, ds);
-	if (err)
-		return err;
+		err = dsa_parse_ports_dn(ports, ds);
+		if (err)
+			return err;
+	} else {
+		err = dsa_parse_member(pdata, &tree, &index);
+		if (err)
+			return err;
+
+		err = dsa_parse_ports(pdata, ds);
+		if (err)
+			return err;
+	}
 
 	dst = dsa_get_dst(tree);
 	if (!dst) {
@@ -630,6 +724,7 @@ static int _dsa_register_switch(struct dsa_switch *ds, struct device *dev)
 	}
 
 	ds->dst = dst;
+	dst->pd2 = pdata;
 	ds->index = index;
 
 	/* Initialize the routing table */
