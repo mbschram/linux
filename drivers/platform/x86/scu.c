@@ -1117,9 +1117,24 @@ static struct dsa_chip_data b53_switch_chip_data = {
 static struct b53_platform_data b53_switch_pdata = {
 	.enabled_ports	= 0x1f,
 	.dsa_pd		= {
-		.nr_chips = 1,
-		/* netdev is filled at runtime */
-		.chip   = &b53_switch_chip_data,
+		.tree	= 0,
+		.index	= 0,
+		.ports	= {
+			{ .name	= "lan1", },
+			{ .name = "lan2", },
+			{ .name = "lan3", },
+			{ .name = "lan4", },
+			{
+				.name = "cpu",
+				.fixed_phy_status = {
+					.speed	= 1000,
+					.duplex	= DUPLEX_FULL,
+					.pause = 1,
+					.asym_pause = 1,
+				},
+				.link_gpio = -1,
+			},
+		},
 	},
 };
 
