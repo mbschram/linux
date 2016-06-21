@@ -18,6 +18,7 @@
 #include <net/dsa.h>
 #include <linux/of.h>
 #include <linux/of_net.h>
+#include <linux/platform_data/dsa.h>
 #include "dsa_priv.h"
 
 static LIST_HEAD(dsa_switch_trees);
@@ -460,7 +461,7 @@ static int dsa_cpu_parse(struct dsa_port *port, u32 index,
 			return -EINVAL;
 		ethernet_dev = of_find_net_device_by_node(ethernet);
 	} else
-		ethernet_dev = dev_to_net_device(dst->pd->netdev);
+		ethernet_dev = dev_to_net_device(dst->pd2->netdev);
 
 	if (!ethernet_dev)
 		return -EPROBE_DEFER;
@@ -563,16 +564,20 @@ static int dsa_parse_ports_dn(struct device_node *ports, struct dsa_switch *ds)
 	return 0;
 }
 
-static int dsa_parse_ports(struct dsa_chip_data *cd, struct dsa_switch *ds)
+static int dsa_parse_ports(struct dsa2_platform_data *pdata, struct dsa_switch *ds)
 {
+	struct dsa2_port_data *port;
 	bool valid_name_found = false;
 	unsigned int i;
 
 	for (i = 0; i < DSA_MAX_PORTS; i++) {
-		if (!cd->port_names[i])
+		port = &pdata->ports[i];
+
+		if (!port->name)
 			continue;
 
-		ds->ports[i].name = cd->port_names[i];
+		ds->ports[i].name = port->name;
+		ds->ports[i].data = port;
 
 		/* Initialize enabled_port_mask now for drv->setup()
 		 * to have access to a correct value, just like what
@@ -614,13 +619,15 @@ static int dsa_parse_member_dn(struct device_node *np, u32 *tree, u32 *index)
 	return 0;
 }
 
-static int dsa_parse_member(struct dsa_platform_data *pd, u32 *tree, u32 *index)
+static int dsa_parse_member(struct dsa2_platform_data *pd, u32 *tree, u32 *index)
 {
 	*tree = *index = 0;
 
-	/* TODO, re-design platform data? */
-	if (pd->nr_chips >= DSA_MAX_SWITCHES || !pd->chip)
+	if (pd->index >= DSA_MAX_SWITCHES)
 		return -EINVAL;
+
+	*tree = pd->tree;
+	*index = pd->index;
 
 	return 0;
 }
@@ -641,7 +648,7 @@ static struct device_node *dsa_get_ports(struct dsa_switch *ds,
 
 static int _dsa_register_switch(struct dsa_switch *ds, struct device *dev)
 {
-	struct dsa_platform_data *pdata = dev->platform_data;
+	struct dsa2_platform_data *pdata = dev->platform_data;
 	struct device_node *np = dev->of_node;
 	struct dsa_switch_tree *dst;
 	struct device_node *ports;
@@ -665,7 +672,7 @@ static int _dsa_register_switch(struct dsa_switch *ds, struct device *dev)
 		if (err)
 			return err;
 
-		err = dsa_parse_ports(&pdata->chip[index], ds);
+		err = dsa_parse_ports(pdata, ds);
 		if (err)
 			return err;
 	}
@@ -683,7 +690,7 @@ static int _dsa_register_switch(struct dsa_switch *ds, struct device *dev)
 	}
 
 	ds->dst = dst;
-	dst->pd = pdata;
+	dst->pd2 = pdata;
 	ds->index = index;
 	dsa_dst_add_ds(dst, ds, index);
 

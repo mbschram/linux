@@ -20,7 +20,7 @@
 #define __B53_H
 
 #include <linux/kernel.h>
-#include <net/dsa.h>
+#include <linux/platform_data/dsa.h>
 
 struct b53_platform_data {
 	u32 chip_id;
@@ -30,7 +30,7 @@ struct b53_platform_data {
 	unsigned big_endian:1;
 	void __iomem *regs;
 
-	struct dsa_platform_data dsa_pd;
+	struct dsa2_platform_data dsa_pd;
 };
 
 #endif

@@ -25,6 +25,7 @@
 #include <linux/sysfs.h>
 #include <linux/phy_fixed.h>
 #include <linux/gpio/consumer.h>
+#include <linux/platform_data/dsa.h>
 #include "dsa_priv.h"
 
 char dsa_driver_version[] = "0.1";
@@ -211,10 +212,14 @@ int dsa_cpu_dsa_setup(struct dsa_switch *ds, struct device *dev,
 		      struct dsa_port *dport, int port)
 {
 	struct device_node *port_dn = dport->dn;
+	struct dsa2_port_data *pdata = dport->data;
 	struct phy_device *phydev;
 	int ret, mode;
 
-	if (of_phy_is_fixed_link(port_dn)) {
+	if (!port_dn && !pdata)
+		return 0;
+
+	if (port_dn && of_phy_is_fixed_link(port_dn)) {
 		ret = of_phy_register_fixed_link(port_dn);
 		if (ret) {
 			dev_err(dev, "failed to register fixed PHY\n");
@@ -225,13 +230,23 @@ int dsa_cpu_dsa_setup(struct dsa_switch *ds, struct device *dev,
 		mode = of_get_phy_mode(port_dn);
 		if (mode < 0)
 			mode = PHY_INTERFACE_MODE_NA;
-		phydev->interface = mode;
-
-		genphy_config_init(phydev);
-		genphy_read_status(phydev);
-		if (ds->drv->adjust_link)
-			ds->drv->adjust_link(ds, port, phydev);
+	} else {
+		phydev = fixed_phy_register(PHY_POLL, &pdata->fixed_phy_status,
+					    pdata->link_gpio,
+					    NULL);
+		if (IS_ERR(phydev)) {
+			dev_err(dev, "failed to register fixed PHY\n");
+			return PTR_ERR(phydev);
+		}
+		mode = pdata->phy_iface;
 	}
+
+	phydev->interface = mode;
+
+	genphy_config_init(phydev);
+	genphy_read_status(phydev);
+	if (ds->drv->adjust_link)
+		ds->drv->adjust_link(ds, port, phydev);
 
 	return 0;
 }
@@ -500,12 +515,14 @@ void dsa_cpu_dsa_destroy(struct dsa_port *port)
 	struct device_node *port_dn = port->dn;
 	struct phy_device *phydev;
 
-	if (of_phy_is_fixed_link(port_dn)) {
+	if (port_dn && of_phy_is_fixed_link(port_dn))
 		phydev = of_phy_find_device(port_dn);
-		if (phydev) {
-			phy_device_free(phydev);
-			fixed_phy_unregister(phydev);
-		}
+	else
+		phydev = port->netdev->phydev;
+
+	if (phydev) {
+		phy_device_free(phydev);
+		fixed_phy_unregister(phydev);
 	}
 }
 
