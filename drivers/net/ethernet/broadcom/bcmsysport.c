@@ -1136,7 +1136,8 @@ static struct sk_buff *bcm_sysport_insert_tsb(struct sk_buff *skb,
 }
 
 static int bcm_sysport_xmit_single(struct sk_buff *skb,
-				   struct bcm_sysport_tx_ring *ring)
+				   struct bcm_sysport_tx_ring *ring,
+				   u32 status)
 {
 	struct bcm_sysport_priv *priv = ring->priv;
 	struct device *kdev = &priv->pdev->dev;
@@ -1147,8 +1148,7 @@ static int bcm_sysport_xmit_single(struct sk_buff *skb,
 	dma_addr_t mapping;
 	u32 len_status;
 
-	skb_len = skb->len;
-
+	skb_len = skb_headlen(skb);
 	mapping = dma_map_single(kdev, skb->data, skb_len, DMA_TO_DEVICE);
 	if (dma_mapping_error(kdev, mapping)) {
 		priv->mib.tx_dma_failed++;
@@ -1168,9 +1168,8 @@ static int bcm_sysport_xmit_single(struct sk_buff *skb,
 
 	desc->addr_lo = lower_32_bits(mapping);
 	len_status = upper_32_bits(mapping) & DESC_ADDR_HI_MASK;
+	len_status |= (status | TX_STATUS_APP_CRC) << DESC_STATUS_SHIFT;
 	len_status |= (skb_len << DESC_LEN_SHIFT);
-	len_status |= (DESC_SOP | DESC_EOP | TX_STATUS_APP_CRC) <<
-		       DESC_STATUS_SHIFT;
 	if (skb->ip_summed == CHECKSUM_PARTIAL)
 		len_status |= (DESC_L4_CSUM << DESC_STATUS_SHIFT);
 
@@ -1189,6 +1188,91 @@ static int bcm_sysport_xmit_single(struct sk_buff *skb,
 
 	/* Write this descriptor address to the RING write port */
 	tdma_port_write_desc_addr(priv, desc, ring->index);
+
+	return 0;
+}
+
+static int bcm_sysport_xmit_frag(skb_frag_t *frag,
+				 struct bcm_sysport_tx_ring *ring,
+				 u32 status)
+{
+	struct bcm_sysport_priv *priv = ring->priv;
+	struct device *kdev = &priv->pdev->dev;
+	struct net_device *dev = priv->netdev;
+	struct bcm_sysport_cb *cb;
+	unsigned int frag_size;
+	struct dma_desc *desc;
+	dma_addr_t mapping;
+	u32 len_status;
+
+	frag_size = skb_frag_size(frag);
+
+	mapping = skb_frag_dma_map(kdev, frag, 0, frag_size, DMA_TO_DEVICE);
+	if (dma_mapping_error(kdev, mapping)) {
+		priv->mib.tx_dma_failed++;
+		netif_err(priv, tx_err, dev, "DMA map failed at %p (len=%d)\n",
+			  frag, frag_size);
+		return -ENOMEM;
+	}
+
+	/* Remember the fragment for future freeing */
+	cb = &ring->cbs[ring->curr_desc];
+	cb->skb = NULL;
+	dma_unmap_addr_set(cb, dma_addr, mapping);
+	dma_unmap_len_set(cb, dma_len, frag_size);
+
+	/* Fetch a descriptor entry from our pool */
+	desc = ring->desc_cpu;
+
+	desc->addr_lo = lower_32_bits(mapping);
+	len_status = upper_32_bits(mapping) & DESC_ADDR_HI_MASK;
+	len_status |= (status << DESC_STATUS_SHIFT);
+	len_status |= (frag_size << DESC_LEN_SHIFT);
+
+	ring->curr_desc++;
+	if (ring->curr_desc == ring->size)
+		ring->curr_desc = 0;
+	ring->desc_count--;
+
+	/* Ensure write completion of the descriptor status/length
+	 * in DRAM before the System Port WRITE_PORT register latches
+	 * the value
+	 */
+	wmb();
+	desc->addr_status_len = len_status;
+	wmb();
+
+	/* Write this descriptor address to the RING write port */
+	tdma_port_write_desc_addr(priv, desc, ring->index);
+
+	return 0;
+}
+
+static int bcm_sysport_xmit_skb(struct sk_buff *skb,
+				struct bcm_sysport_tx_ring *ring)
+{
+	unsigned int i;
+	int nr_frags;
+	u32 status;
+	int ret;
+
+	nr_frags = skb_shinfo(skb)->nr_frags;
+
+	status = DESC_SOP;
+	if (nr_frags == 0)
+		status |= DESC_EOP;
+
+	ret = bcm_sysport_xmit_single(skb, ring, status);
+	if (ret)
+		return ret;
+
+	for (i = 0; i < nr_frags; i++) {
+		ret = bcm_sysport_xmit_frag(&skb_shinfo(skb)->frags[i],
+					    ring,
+					    (i == nr_frags - 1) ? DESC_EOP : 0);
+		if (ret)
+			return ret;
+	}
 
 	return 0;
 }
@@ -1237,7 +1321,7 @@ static netdev_tx_t bcm_sysport_xmit(struct sk_buff *skb,
 		}
 	}
 
-	ret = bcm_sysport_xmit_single(skb, ring);
+	ret = bcm_sysport_xmit_skb(skb, ring);
 	if (ret) {
 		ret = NETDEV_TX_OK;
 		goto out;
@@ -1383,7 +1467,7 @@ static int bcm_sysport_init_tx_ring(struct bcm_sysport_priv *priv,
 	 * its size for the hysteresis trigger
 	 */
 	tdma_writel(priv, ring->size |
-			1 << RING_HYST_THRESH_SHIFT,
+			(MAX_SKB_FRAGS + 1) << RING_HYST_THRESH_SHIFT,
 			TDMA_DESC_RING_MAX_HYST(index));
 
 	/* Enable the ring queue in the arbiter */
@@ -2093,7 +2177,8 @@ static int bcm_sysport_probe(struct platform_device *pdev)
 
 	/* HW supported features, none enabled by default */
 	dev->hw_features |= NETIF_F_RXCSUM | NETIF_F_HIGHDMA |
-				NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM;
+				NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM |
+				NETIF_F_SG;
 
 	/* Request the WOL interrupt and advertise suspend if available */
 	priv->wol_irq_disabled = 1;
