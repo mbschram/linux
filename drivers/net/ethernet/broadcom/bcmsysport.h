@@ -598,6 +598,9 @@ struct bcm_sysport_mib {
 	u32 alloc_rx_buff_failed;
 	u32 rx_dma_failed;
 	u32 tx_dma_failed;
+	u32 tx_frags;
+	u32 tx_tso_hdrs;
+	u32 tx_tso_segs;
 };
 
 /* HW maintains a large list of counters */
@@ -695,6 +698,8 @@ struct bcm_sysport_tx_ring {
 	struct bcm_sysport_priv *priv;	/* private context backpointer */
 	unsigned long	packets;	/* packets statistics */
 	unsigned long	bytes;		/* bytes statistics */
+	void		*tso_hdrs;	/* CPU view of the TSO headers */
+	dma_addr_t	tso_hdrs_dma;	/* TSO header DMA cookie */
 };
 
 /* Driver private structure */

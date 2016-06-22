@@ -25,6 +25,7 @@
 #include <net/dsa.h>
 #include <net/ip.h>
 #include <net/ipv6.h>
+#include <net/tso.h>
 
 #include "bcmsysport.h"
 
@@ -124,6 +125,15 @@ static inline void tdma_port_write_desc_addr(struct bcm_sysport_priv *priv,
 	tdma_writel(priv, desc->addr_status_len, TDMA_WRITE_PORT_HI(port));
 	tdma_writel(priv, desc->addr_lo, TDMA_WRITE_PORT_LO(port));
 }
+
+/* TSO definitions */
+#define TSO_HEADER_SIZE			128
+#define BCM_SYSPORT_MAX_TSO_SEGS	64
+#define BCM_SYSPORT_MAX_SKB_DESCS	(BCM_SYSPORT_MAX_TSO_SEGS * 2 + \
+					 MAX_SKB_FRAGS)
+#define IS_TSO_HEADER(ring, addr)	\
+	((addr >= ring->tso_hdrs_dma) && \
+	 (addr < ring->tso_hdrs_dma + ring->size * TSO_HEADER_SIZE))
 
 /* Ethtool operations */
 static int bcm_sysport_set_rx_csum(struct net_device *dev,
@@ -285,6 +295,9 @@ static const struct bcm_sysport_stats bcm_sysport_gstrings_stats[] = {
 	STAT_MIB_SOFT("alloc_rx_buff_failed", mib.alloc_rx_buff_failed),
 	STAT_MIB_SOFT("rx_dma_failed", mib.rx_dma_failed),
 	STAT_MIB_SOFT("tx_dma_failed", mib.tx_dma_failed),
+	STAT_MIB_SOFT("tx_skb_frags", mib.tx_frags),
+	STAT_MIB_SOFT("tx_tso_hdrs", mib.tx_tso_hdrs),
+	STAT_MIB_SOFT("tx_tso_segs", mib.tx_tso_segs),
 	/* Per TX-queue statistics are dynamically appended */
 };
 
@@ -786,6 +799,11 @@ static void bcm_sysport_tx_reclaim_one(struct bcm_sysport_tx_ring *ring,
 	struct bcm_sysport_priv *priv = ring->priv;
 	struct device *kdev = &priv->pdev->dev;
 
+	if (IS_TSO_HEADER(ring, dma_unmap_addr(cb, dma_addr))) {
+		(*pkts_compl)++;
+		return;
+	}
+
 	if (cb->skb) {
 		ring->bytes += cb->skb->len;
 		*bytes_compl += cb->skb->len;
@@ -1135,6 +1153,170 @@ static struct sk_buff *bcm_sysport_insert_tsb(struct sk_buff *skb,
 	return skb;
 }
 
+static inline void bcm_sysport_hdr_tso(struct sk_buff *skb,
+				       struct bcm_sysport_tx_ring *ring,
+				       int len)
+{
+	struct bcm_sysport_priv *priv = ring->priv;
+	int hdr_len = skb_transport_offset(skb) + tcp_hdrlen(skb);
+	struct bcm_sysport_cb *cb;
+	struct dma_desc *desc;
+	dma_addr_t addr;
+	u32 len_status;
+
+	/* Fetch a descriptor entry from our pool */
+	cb = &ring->cbs[ring->curr_desc];
+	cb->skb = NULL;
+	desc = ring->desc_cpu;
+
+	addr = ring->tso_hdrs_dma + ring->curr_desc * TSO_HEADER_SIZE;
+
+	/* Make sure the packet will ingress the switch port */
+	if (hdr_len < ETH_ZLEN + ENET_BRCM_TAG_LEN)
+		hdr_len = ETH_ZLEN + ENET_BRCM_TAG_LEN;
+
+	desc->addr_lo = lower_32_bits(addr);
+	len_status = upper_32_bits(addr) & DESC_ADDR_HI_MASK;
+	len_status |= (hdr_len << DESC_LEN_SHIFT);
+	len_status |= (DESC_SOP | TX_STATUS_APP_CRC) <<
+		       DESC_STATUS_SHIFT;
+
+	ring->curr_desc++;
+	if (ring->curr_desc == ring->size)
+		ring->curr_desc = 0;
+	ring->desc_count--;
+
+	/* Ensure write completion of the descriptor status/length
+	 * in DRAM before the System Port WRITE_PORT register latches
+	 * the value
+	 */
+	wmb();
+	desc->addr_status_len = len_status;
+	wmb();
+
+	/* Write this descriptor address to the RING write port */
+	tdma_port_write_desc_addr(priv, desc, ring->index);
+
+	priv->mib.tx_tso_hdrs++;
+}
+
+static int bcm_sysport_data_tso(struct sk_buff *skb,
+				struct bcm_sysport_tx_ring *ring,
+				char *data, int len,
+				bool last_tcp, bool is_last)
+{
+	struct bcm_sysport_priv *priv = ring->priv;
+	struct net_device *dev = priv->netdev;
+	struct device *kdev = &priv->pdev->dev;
+	struct bcm_sysport_cb *cb;
+	struct dma_desc *desc;
+	u32 len_status;
+	dma_addr_t mapping;
+
+	if (len < ETH_ZLEN + ENET_BRCM_TAG_LEN)
+		len = ETH_ZLEN + ENET_BRCM_TAG_LEN;
+
+	if (len <= 8 && (uintptr_t)data & 0x7) {
+		memcpy(ring->tso_hdrs + ring->curr_desc * TSO_HEADER_SIZE,
+		       data, len);
+		mapping = ring->tso_hdrs_dma +
+			  ring->curr_desc * TSO_HEADER_SIZE;
+	} else {
+		mapping = dma_map_single(kdev, data, len, DMA_TO_DEVICE);
+		if (dma_mapping_error(kdev, mapping)) {
+			priv->mib.tx_dma_failed++;
+			netif_err(priv, tx_err, dev,
+				  "DMA map failed at %p (len=%d)\n",
+				  data, len);
+			return -ENOMEM;
+		}
+	}
+
+	/* Fetch a descriptor entry from our pool */
+	cb = &ring->cbs[ring->curr_desc];
+	cb->skb = NULL;
+	desc = ring->desc_cpu;
+	dma_unmap_addr_set(cb, dma_addr, mapping);
+	dma_unmap_len_set(cb, dma_len, len);
+
+	desc->addr_lo = lower_32_bits(mapping);
+	len_status = upper_32_bits(mapping) & DESC_ADDR_HI_MASK;
+	len_status |= (len << DESC_LEN_SHIFT);
+	if (last_tcp || is_last)
+		len_status |= (DESC_EOP << DESC_STATUS_SHIFT);
+
+	ring->curr_desc++;
+	if (ring->curr_desc == ring->size)
+		ring->curr_desc = 0;
+	ring->desc_count--;
+
+	/* Ensure write completion of the descriptor status/length
+	 * in DRAM before the System Port WRITE_PORT register latches
+	 * the value
+	 */
+	wmb();
+	desc->addr_status_len = len_status;
+	wmb();
+
+	/* Write this descriptor address to the RING write port */
+	tdma_port_write_desc_addr(priv, desc, ring->index);
+
+	priv->mib.tx_tso_segs++;
+
+	return 0;
+}
+
+static int bcm_sysport_xmit_tso(struct sk_buff *skb,
+				struct bcm_sysport_tx_ring *ring)
+{
+	struct bcm_sysport_priv *priv = ring->priv;
+	struct net_device *dev = priv->netdev;
+	int total_len, data_left, ret;
+	struct tso_t tso;
+	int hdr_len;
+
+	hdr_len = skb_transport_offset(skb) + tcp_hdrlen(skb);
+
+	if ((ring->curr_desc + tso_count_descs(skb)) >= ring->size) {
+		netdev_dbg(dev, "not enough descriptors for TSO!\n");
+		return -EBUSY;
+	}
+
+	/* Initialize TSO handler, prepare first payload */
+	tso_start(skb, &tso);
+
+	total_len = skb->len - hdr_len;
+	while (total_len > 0) {
+		void *hdr;
+
+		data_left = min_t(int, skb_shinfo(skb)->gso_size, total_len);
+		total_len -= data_left;
+
+		/* Prepare packet headers: MAC + IP + TCP */
+		hdr = ring->tso_hdrs + ring->curr_desc * TSO_HEADER_SIZE;
+		tso_build_hdr(skb, hdr, &tso, data_left, total_len == 0);
+		bcm_sysport_hdr_tso(skb, ring, data_left);
+
+		while (data_left > 0) {
+			int size;
+
+			size = min_t(int, tso.size, data_left);
+			ret = bcm_sysport_data_tso(skb, ring, tso.data,
+						   size, size == data_left,
+						   total_len == 0);
+			if (ret)
+				goto err_release;
+
+			data_left -= size;
+			tso_build_data(skb, &tso, size);
+		}
+	}
+
+	return 0;
+err_release:
+	return ret;
+}
+
 static int bcm_sysport_xmit_single(struct sk_buff *skb,
 				   struct bcm_sysport_tx_ring *ring,
 				   u32 status)
@@ -1245,6 +1427,8 @@ static int bcm_sysport_xmit_frag(skb_frag_t *frag,
 	/* Write this descriptor address to the RING write port */
 	tdma_port_write_desc_addr(priv, desc, ring->index);
 
+	priv->mib.tx_frags++;
+
 	return 0;
 }
 
@@ -1321,7 +1505,10 @@ static netdev_tx_t bcm_sysport_xmit(struct sk_buff *skb,
 		}
 	}
 
-	ret = bcm_sysport_xmit_skb(skb, ring);
+	if (skb_is_gso(skb))
+		ret = bcm_sysport_xmit_tso(skb, ring);
+	else
+		ret = bcm_sysport_xmit_skb(skb, ring);
 	if (ret) {
 		ret = NETDEV_TX_OK;
 		goto out;
@@ -1438,6 +1625,13 @@ static int bcm_sysport_init_tx_ring(struct bcm_sysport_priv *priv,
 		return -ENOMEM;
 	}
 
+	ring->tso_hdrs = dma_alloc_coherent(kdev, size * TSO_HEADER_SIZE,
+					    &ring->tso_hdrs_dma, GFP_KERNEL);
+	if (!ring->tso_hdrs) {
+		netif_err(priv, hw, priv->netdev, "TSO header DMA failed\n");
+		return -ENOMEM;
+	}
+
 	ring->cbs = kcalloc(size, sizeof(struct bcm_sysport_cb), GFP_KERNEL);
 	if (!ring->cbs) {
 		netif_err(priv, hw, priv->netdev, "CB allocation failed\n");
@@ -1467,7 +1661,8 @@ static int bcm_sysport_init_tx_ring(struct bcm_sysport_priv *priv,
 	 * its size for the hysteresis trigger
 	 */
 	tdma_writel(priv, ring->size |
-			(MAX_SKB_FRAGS + 1) << RING_HYST_THRESH_SHIFT,
+			(BCM_SYSPORT_MAX_TSO_SEGS + 1) <<
+			RING_HYST_THRESH_SHIFT,
 			TDMA_DESC_RING_MAX_HYST(index));
 
 	/* Enable the ring queue in the arbiter */
@@ -1510,6 +1705,12 @@ static void bcm_sysport_fini_tx_ring(struct bcm_sysport_priv *priv,
 
 	kfree(ring->cbs);
 	ring->cbs = NULL;
+
+	if (ring->tso_hdrs_dma) {
+		dma_free_coherent(kdev, ring->size * TSO_HEADER_SIZE,
+				  ring->tso_hdrs, ring->tso_hdrs_dma);
+		ring->tso_hdrs_dma = 0;
+	}
 
 	if (ring->desc_dma) {
 		dma_free_coherent(kdev, sizeof(struct dma_desc),
@@ -2178,7 +2379,8 @@ static int bcm_sysport_probe(struct platform_device *pdev)
 	/* HW supported features, none enabled by default */
 	dev->hw_features |= NETIF_F_RXCSUM | NETIF_F_HIGHDMA |
 				NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM |
-				NETIF_F_SG;
+				NETIF_F_SG | NETIF_F_TSO;
+	dev->gso_max_segs = BCM_SYSPORT_MAX_TSO_SEGS;
 
 	/* Request the WOL interrupt and advertise suspend if available */
 	priv->wol_irq_disabled = 1;
