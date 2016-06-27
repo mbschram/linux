@@ -154,7 +154,7 @@ static int find_last_fixed_phy(void)
 /* Register DSA_MAX_SWITCHES - 1, since the first switch is hanging off
  * lo
  */
-#define NUM_SWITCHES	DSA_MAX_SWITCHES - 1
+#define NUM_SWITCHES	DSA_MAX_SWITCHES - 2
 
 static struct dsa2_platform_data dsa_pdata2[NUM_SWITCHES];
 
@@ -190,12 +190,14 @@ static int dsa_loop_drv_probe(struct platform_device *pdev)
 	struct dsa_loop_priv *ps;
 	struct dsa_switch *ds;
 	unsigned int i, port_base, num_links = 0;
-	unsigned int num_ports = 4;
+	unsigned int num_ports = 2;
 	int ret;
 
 	ds = devm_kzalloc(&pdev->dev, sizeof(*ds) + sizeof(*ps), GFP_KERNEL);
 	if (!ds)
 		return -ENOMEM;
+
+	dev_info(&pdev->dev, "allocated ds @ %p\n", ds);
 
 	status.duplex = DUPLEX_FULL;
 	status.speed = SPEED_100;
@@ -212,21 +214,23 @@ static int dsa_loop_drv_probe(struct platform_device *pdev)
 		pdata->ports[i].name = kasprintf(GFP_KERNEL, "sw%dport%d", pdev->id + 1, i);
 	}
 
-	links[0].index = pdev->id;
-	if (pdev->id == 0)
-		links[0].port = DSA_MAX_PORTS - 2;
-	else
-		links[0].port = num_ports;
-	num_links++;
-
-	if (pdev->id != ARRAY_SIZE(dsa_loop_pdevs) - 1) {
-		links[1].index = pdev->id + 2;
-		links[1].port = num_ports;
+	if (pdev->id == 0) {
+		links[0].index = 2;
+		links[0].port = 9;
 		num_links++;
-	} else
-		dev_info(&pdev->dev, "Last switch, not adding a second link\n");
-
-	dsa_fill_switch_link(&pdata->ports[i], links, num_links);
+		dsa_fill_switch_link(&pdata->ports[5], links, num_links);
+		links[0].index = 0;
+		links[0].port = 5;
+		dsa_fill_switch_link(&pdata->ports[6], links, num_links);
+	} else {
+		links[0].index = 1;
+		links[0].port = 5;
+		num_links++;
+		links[1].index = 0;
+		links[1].port = 5;
+		num_links++;
+		dsa_fill_switch_link(&pdata->ports[9], links, num_links);
+	}
 
 	ps = (struct dsa_loop_priv *)(ds + 1);
 
@@ -251,12 +255,15 @@ static int dsa_loop_drv_probe(struct platform_device *pdev)
 static int dsa_loop_drv_remove(struct platform_device *pdev)
 {
 	struct dsa_switch *ds = dev_get_drvdata(&pdev->dev);
-	struct dsa_loop_priv *ps = ds_to_priv(ds);
-	unsigned int i, port_base = ps->port_base;
 
+	dev_info(&pdev->dev, "unregistering ds @ %p\n", ds);
 	dsa_unregister_switch(ds);
 
 	return 0;
+}
+
+static void dsa_loop_drv_shutdown(struct platform_device *pdev)
+{
 }
 
 static struct platform_driver dsa_loop_drv = {
@@ -265,21 +272,34 @@ static struct platform_driver dsa_loop_drv = {
 	},
 	.probe	= dsa_loop_drv_probe,
 	.remove	= dsa_loop_drv_remove,
+	.shutdown = dsa_loop_drv_shutdown,
 };
 
 static struct dsa2_platform_data dsa_pdata = {
 	.tree	= 0,
 	.index	= 0,
 	.ports	= {
-		[DSA_MAX_PORTS - 2] = {
+		[5] = {
 			.name	= "dsa",
 			.links[0] = {
 				.valid	= true,
 				.index	= 1,
-				.port	= DSA_MAX_PORTS / 2 + 1,
+				.port	= 5,
 			},
+			.links[1] = {
+				.valid	= true,
+				.index	= 2,
+				.port	= 6,
+			},
+			/*.fixed_phy_status = {*/
+				/*.speed	= 1000,*/
+				/*.duplex	= DUPLEX_FULL,*/
+				/*.pause	= 1,*/
+				/*.asym_pause = 1,*/
+			/*},*/
+			/*.link_gpio = -1,*/
 		},
-		[DSA_MAX_PORTS - 1] = {
+		[6] = {
 			.name	= "cpu",
 			.fixed_phy_status = {
 				.speed	= 1000,
@@ -314,7 +334,7 @@ static int setup_dsa(struct net_device *dev)
 
 	port_base = find_last_fixed_phy();
 
-	for (i = 0; i < ARRAY_SIZE(dsa_pdata.ports) - 1; i++) {
+	for (i = 0; i < 4; i++) {
 		spin_lock(&phydevs_lock);
 		phydevs[port_base + i] = fixed_phy_register(PHY_POLL, &status, -1, NULL);
 		spin_unlock(&phydevs_lock);
