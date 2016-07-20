@@ -41,12 +41,15 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/mdio.h>
 
+#include "mdio-boardinfo.h"
+
 int mdiobus_register_device(struct mdio_device *mdiodev)
 {
 	if (mdiodev->bus->mdio_map[mdiodev->addr])
 		return -EBUSY;
 
 	mdiodev->bus->mdio_map[mdiodev->addr] = mdiodev;
+	mdiobus_setup_mdiodev_from_board_info(mdiodev);
 
 	return 0;
 }
