@@ -22,4 +22,7 @@ void __init bcm47xx_bus_setup(void);
 /* workarounds.c */
 void __init bcm47xx_workarounds(void);
 
+/* eth-switch.c */
+void __init bcm47xx_ethernet_switch_register(void);
+
 #endif

@@ -242,6 +242,7 @@ static int __init bcm47xx_register_bus_complete(void)
 	bcm47xx_buttons_register();
 	bcm47xx_leds_register();
 	bcm47xx_workarounds();
+	bcm47xx_ethernet_switch_register();
 
 	fixed_phy_add(PHY_POLL, 0, &bcm47xx_fixed_phy_status, -1);
 	return 0;
