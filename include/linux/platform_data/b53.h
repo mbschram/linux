@@ -20,10 +20,12 @@
 #define __B53_H
 
 #include <linux/kernel.h>
+#include <linux/platform_data/dsa.h>
 
 struct b53_platform_data {
 	u32 chip_id;
 	u16 enabled_ports;
+	struct dsa2_platform_data dsa_pd;
 
 	/* only used by MMAP'd driver */
 	unsigned big_endian:1;
