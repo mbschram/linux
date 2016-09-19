@@ -321,6 +321,14 @@ static int dsa_slave_port_obj_add(struct net_device *dev,
 	struct dsa_port *dp = p->dp;
 	int err;
 
+	/* Here we may be called with an orig_dev which is different from dev,
+	 * on purpose, to receive request coming from e.g the bridge master
+	 * device. Although there are no network device associated with CPU/DSA
+	 * ports, we may still have programming operation for these ports.
+	 */
+	if (obj->orig_dev == p->bridge_dev)
+		port = dp->cpu_dp;
+
 	/* For the prepare phase, ensure the full set of changes is feasable in
 	 * one go in order to signal a failure properly. If an operation is not
 	 * supported, return -EOPNOTSUPP.
@@ -348,6 +356,14 @@ static int dsa_slave_port_obj_del(struct net_device *dev,
 	struct dsa_slave_priv *p = netdev_priv(dev);
 	struct dsa_port *dp = p->dp;
 	int err;
+
+	/* Here we may be called with an orig_dev which is different from dev,
+	 * on purpose, to receive request coming from e.g the bridge master
+	 * device. Although there are no network device associated with CPU/DSA
+	 * ports, we may still have programming operation for these ports.
+	 */
+	if (obj->orig_dev == p->bridge_dev)
+		port = dp->cpu_dp;
 
 	switch (obj->id) {
 	case SWITCHDEV_OBJ_ID_PORT_MDB:
