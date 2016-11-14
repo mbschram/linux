@@ -80,6 +80,8 @@
 
 #define I2C_TIMEOUT_MSEC             50000
 #define M_TX_RX_FIFO_SIZE            64
+#define M_RX_FIFO_SIZE			63
+#define MAX_READ_LENGTH			0x4000
 
 enum bus_speed_index {
 	I2C_SPD_100K = 0,
@@ -102,6 +104,7 @@ struct bcm_iproc_i2c_dev {
 
 	/* bytes that have been transferred */
 	unsigned int tx_bytes;
+	unsigned int rx_bytes;
 };
 
 /*
@@ -157,8 +160,50 @@ static irqreturn_t bcm_iproc_i2c_isr(int irq, void *data)
 	}
 
 	if (status & BIT(IS_M_START_BUSY_SHIFT)) {
-		iproc_i2c->xfer_is_done = 1;
-		complete(&iproc_i2c->done);
+		struct i2c_msg *msg = iproc_i2c->msg;
+
+		if (msg->flags & I2C_M_RD) {
+			u32 rx_cnt, rx_bytes;
+			u32 val;
+
+			rx_bytes = min_t(unsigned int,
+					 (msg->len - iproc_i2c->rx_bytes),
+					 M_RX_FIFO_SIZE);
+			for (rx_cnt = 0; rx_cnt < rx_bytes; rx_cnt++) {
+				/* copy data to buffer */
+				u32 data;
+				u32 idx = iproc_i2c->rx_bytes + rx_cnt;
+
+				data = readl(iproc_i2c->base + M_RX_OFFSET) >>
+					     M_RX_DATA_SHIFT;
+				msg->buf[idx] = data & M_RX_DATA_MASK;
+			}
+
+			/* update number of bytes received*/
+			iproc_i2c->rx_bytes += rx_bytes;
+
+			if (msg->len > iproc_i2c->rx_bytes) {
+				/* prepare for next bytes to read */
+				writel((msg->addr << 1) | 1,
+					iproc_i2c->base + M_TX_OFFSET);
+
+				rx_bytes = msg->len - iproc_i2c->rx_bytes;
+				if (rx_bytes > M_RX_FIFO_SIZE)
+					rx_bytes = M_RX_FIFO_SIZE;
+
+				val = BIT(M_CMD_START_BUSY_SHIFT) |
+				      (M_CMD_PROTOCOL_BLK_RD <<
+				       M_CMD_PROTOCOL_SHIFT) |
+				      (rx_bytes << M_CMD_RD_CNT_SHIFT);
+				writel(val, iproc_i2c->base + M_CMD_OFFSET);
+			} else {
+				iproc_i2c->xfer_is_done = 1;
+				complete(&iproc_i2c->done);
+			}
+		} else {
+			iproc_i2c->xfer_is_done = 1;
+			complete_all(&iproc_i2c->done);
+		}
 	}
 
 	writel(status, iproc_i2c->base + IS_OFFSET);
@@ -317,8 +362,10 @@ static int bcm_iproc_i2c_xfer_single_msg(struct bcm_iproc_i2c_dev *iproc_i2c,
 	 */
 	val = BIT(M_CMD_START_BUSY_SHIFT);
 	if (msg->flags & I2C_M_RD) {
+		iproc_i2c->rx_bytes = 0;
 		val |= (M_CMD_PROTOCOL_BLK_RD << M_CMD_PROTOCOL_SHIFT) |
-		       (msg->len << M_CMD_RD_CNT_SHIFT);
+		       (min_t(unsigned int, msg->len, M_RX_FIFO_SIZE) <<
+			M_CMD_RD_CNT_SHIFT);
 	} else {
 		val |= (M_CMD_PROTOCOL_BLK_WR << M_CMD_PROTOCOL_SHIFT);
 	}
@@ -351,17 +398,6 @@ static int bcm_iproc_i2c_xfer_single_msg(struct bcm_iproc_i2c_dev *iproc_i2c,
 		      (1 << M_FIFO_TX_FLUSH_SHIFT);
 		writel(val, iproc_i2c->base + M_FIFO_CTRL_OFFSET);
 		return ret;
-	}
-
-	/*
-	 * For a read operation, we now need to load the data from FIFO
-	 * into the memory buffer
-	 */
-	if (msg->flags & I2C_M_RD) {
-		for (i = 0; i < msg->len; i++) {
-			msg->buf[i] = (readl(iproc_i2c->base + M_RX_OFFSET) >>
-				      M_RX_DATA_SHIFT) & M_RX_DATA_MASK;
-		}
 	}
 
 	return 0;
@@ -397,7 +433,7 @@ static const struct i2c_algorithm bcm_iproc_algo = {
 
 static const struct i2c_adapter_quirks bcm_iproc_i2c_quirks = {
 	/* need to reserve one byte in the FIFO for the slave address */
-	.max_read_len = M_TX_RX_FIFO_SIZE - 1,
+	.max_read_len = MAX_READ_LENGTH,
 };
 
 static int bcm_iproc_i2c_cfg_speed(struct bcm_iproc_i2c_dev *iproc_i2c)
