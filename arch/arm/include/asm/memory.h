@@ -119,6 +119,16 @@
 #define KERNEL_END		_end
 
 /*
+ * The size of the KASAN shadow region. This should be 1/8th of the
+ * size of the entire kernel virtual address space.
+ */
+#ifdef CONFIG_KASAN
+#define KASAN_SHADOW_SIZE	(((unsigned long)high_memory - PAGE_OFFSET) / 8)
+#else
+#define KASAN_SHADOW_SIZE	(0)
+#endif
+
+/*
  * We fix the TCM memories max 32 KiB ITCM resp DTCM at these
  * locations
  */

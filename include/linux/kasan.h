@@ -3,6 +3,7 @@
 
 #include <linux/sched.h>
 #include <linux/types.h>
+#include <linux/mm.h>
 
 struct kmem_cache;
 struct page;
