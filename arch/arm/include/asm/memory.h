@@ -261,6 +261,8 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
 	((((unsigned long)(kaddr) - PAGE_OFFSET) >> PAGE_SHIFT) + \
 	 PHYS_PFN_OFFSET)
 
+#define sym_to_pfn(x)	__phys_to_pfn(__pa_symbol(x))
+
 #define __pa_symbol_nodebug(x)	__virt_to_phys_nodebug((x))
 
 #ifdef CONFIG_DEBUG_VIRTUAL
@@ -296,6 +298,7 @@ static inline void *phys_to_virt(phys_addr_t x)
 #define __pa_symbol(x)		__phys_addr_symbol(RELOC_HIDE((unsigned long)(x), 0))
 #define __va(x)			((void *)__phys_to_virt((phys_addr_t)(x)))
 #define pfn_to_kaddr(pfn)	__va((phys_addr_t)(pfn) << PAGE_SHIFT)
+#define __phys_to_kimg(x)	__phys_to_virt((phys_addr_t)(x))
 
 
 extern long long arch_phys_to_idmap_offset;

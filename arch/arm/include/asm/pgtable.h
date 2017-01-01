@@ -187,9 +187,14 @@ extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
 
 #define pmd_none(pmd)		(!pmd_val(pmd))
 
+static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
+{
+	return pmd_val(pmd) & PHYS_MASK & (s32)PAGE_MASK;
+}
+
 static inline pte_t *pmd_page_vaddr(pmd_t pmd)
 {
-	return __va(pmd_val(pmd) & PHYS_MASK & (s32)PAGE_MASK);
+	return __va(pmd_page_paddr(pmd));
 }
 
 #define pmd_page(pmd)		pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
@@ -203,8 +208,9 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
 #endif
 
 #define pte_index(addr)		(((addr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
-
+#define pte_offset_phys(pmd,addr)	(pmd_page_paddr(*(pmd)) + pte_index(addr) * sizeof(pte_t))
 #define pte_offset_kernel(pmd,addr)	(pmd_page_vaddr(*(pmd)) + pte_index(addr))
+#define pte_offset_kimg(pmd,addr)	((pte_t *)__phys_to_kimg(pte_offset_phys((pmd), (addr))))
 
 #define pte_offset_map(pmd,addr)	(__pte_map(pmd) + pte_index(addr))
 #define pte_unmap(pte)			__pte_unmap(pte)
