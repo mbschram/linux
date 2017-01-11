@@ -53,7 +53,8 @@
 #define SCU_RD_LED_GPIO		SCU_EXT_GPIO(1, 0)
 #define SCU_WLES_LED_GPIO	SCU_EXT_GPIO(1, 1)
 #define SCU_LD_FAIL_LED_GPIO	SCU_EXT_GPIO(1, 2)
-#define SCU_SW_LED_GPIO		SCU_EXT_GPIO(1, 3)	/* shared control with PIC */
+/* shared control with PIC */
+#define SCU_SW_LED_GPIO		SCU_EXT_GPIO(1, 3)
 
 #define SCU_SD_ACTIVE_1_GPIO	SCU_EXT_GPIO(2, 0)
 #define SCU_SD_ERROR_1_GPIO	SCU_EXT_GPIO(2, 1)
@@ -561,7 +562,7 @@ static umode_t scu_attr_is_visible(struct kobject *kobj, struct attribute *attr,
 	 * write accesses to it.
 	 */
 	if (index >= 1 && !data->eeprom_accessible)
-			mode &= S_IRUGO;
+		mode &= S_IRUGO;
 
 	if (index >= 4 && data->pdata->version == scu1)
 		return 0;
@@ -660,7 +661,7 @@ static struct gpio_led pca_gpio_leds1[] = {
 	 .active_low = 1,
 	 .default_trigger = "none",
 	 .default_state = LEDS_GPIO_DEFSTATE_OFF,
-	 }
+	}
 };
 
 static struct gpio_led_platform_data pca_gpio_led_info1 = {
@@ -710,7 +711,7 @@ static struct gpio_led pca_gpio_leds2[] = {
 	 .active_low = 1,
 	 .default_trigger = "none",
 	 .default_state = LEDS_GPIO_DEFSTATE_OFF,
-	 }
+	}
 };
 
 static struct gpio_led_platform_data pca_gpio_led_info2 = {
@@ -760,7 +761,7 @@ static struct gpio_led pca_gpio_leds3[] = {
 	 .active_low = 1,
 	 .default_trigger = "none",
 	 .default_state = LEDS_GPIO_DEFSTATE_OFF,
-	 }
+	}
 };
 
 static struct gpio_led_platform_data pca_gpio_led_info3 = {
@@ -848,8 +849,9 @@ static const char *pca9557_gpio_names[8] = {
 	"pca9557:spare2",
 };
 
-static int scu_gpio_common_setup(unsigned gpio_base, unsigned ngpio, u32 mask,
-				 u32 is_input, u32 is_active, u32 active_low)
+static int scu_gpio_common_setup(unsigned int gpio_base, unsigned int ngpio,
+				 u32 mask, u32 is_input, u32 is_active,
+				 u32 active_low)
 {
 	int i;
 	unsigned long flags;
@@ -873,41 +875,46 @@ static int scu_gpio_common_setup(unsigned gpio_base, unsigned ngpio, u32 mask,
 }
 
 static int pca9538_ext0_setup(struct i2c_client *client,
-			      unsigned gpio_base, unsigned ngpio, void *context)
+			      unsigned int gpio_base, unsigned int ngpio,
+			      void *context)
 {
 	scu_gpio_common_setup(gpio_base, ngpio, 0xff, 0x33, 0xcc, 0x00);
 	return 0;
 }
 
 static int pca9538_ext1_setup(struct i2c_client *client,
-			      unsigned gpio_base, unsigned ngpio, void *context)
+			      unsigned int gpio_base, unsigned int ngpio,
+			      void *context)
 {
 	scu_gpio_common_setup(gpio_base, ngpio, 0xf0, 0x00, 0x00, 0x00);
 	return 0;
 }
 
 static int pca9538_ext2_setup(struct i2c_client *client,
-			      unsigned gpio_base, unsigned ngpio, void *context)
+			      unsigned int gpio_base, unsigned int ngpio,
+			      void *context)
 {
 	scu_gpio_common_setup(gpio_base, ngpio, 0xc0, 0x80, 0x40, 0x00);
 	return 0;
 }
 
 static int pca9538_ext3_setup(struct i2c_client *client,
-			      unsigned gpio_base, unsigned ngpio, void *context)
+			      unsigned int gpio_base, unsigned int ngpio,
+			      void *context)
 {
 	scu_gpio_common_setup(gpio_base, ngpio, 0xc0, 0x80, 0x40, 0x00);
 	return 0;
 }
 
 static int pca9557_setup(struct i2c_client *client,
-			 unsigned gpio_base, unsigned ngpio, void *context)
+			 unsigned int gpio_base, unsigned int ngpio,
+			 void *context)
 {
 	scu_gpio_common_setup(gpio_base, ngpio, 0x3f, 0x3f, 0x00, 0x3f);
 	return 0;
 }
 
-static void scu_gpio_common_teardown(unsigned gpio_base, int ngpio, u32 mask)
+static void scu_gpio_common_teardown(unsigned int gpio_base, int ngpio, u32 mask)
 {
 	int i;
 
@@ -920,7 +927,7 @@ static void scu_gpio_common_teardown(unsigned gpio_base, int ngpio, u32 mask)
 }
 
 static int pca9538_ext0_teardown(struct i2c_client *client,
-				 unsigned gpio_base, unsigned ngpio,
+				 unsigned int gpio_base, unsigned int ngpio,
 				 void *context)
 {
 	scu_gpio_common_teardown(gpio_base, ngpio, 0xff);
@@ -928,7 +935,7 @@ static int pca9538_ext0_teardown(struct i2c_client *client,
 }
 
 static int pca9538_ext1_teardown(struct i2c_client *client,
-				 unsigned gpio_base, unsigned ngpio,
+				 unsigned int gpio_base, unsigned int ngpio,
 				 void *context)
 {
 	scu_gpio_common_teardown(gpio_base, ngpio, 0xf0);
@@ -936,7 +943,7 @@ static int pca9538_ext1_teardown(struct i2c_client *client,
 }
 
 static int pca9538_ext2_teardown(struct i2c_client *client,
-				 unsigned gpio_base, unsigned ngpio,
+				 unsigned int gpio_base, unsigned int ngpio,
 				 void *context)
 {
 	scu_gpio_common_teardown(gpio_base, ngpio, 0xc0);
@@ -944,7 +951,7 @@ static int pca9538_ext2_teardown(struct i2c_client *client,
 }
 
 static int pca9538_ext3_teardown(struct i2c_client *client,
-				 unsigned gpio_base, unsigned ngpio,
+				 unsigned int gpio_base, unsigned int ngpio,
 				 void *context)
 {
 	scu_gpio_common_teardown(gpio_base, ngpio, 0xc0);
@@ -952,7 +959,7 @@ static int pca9538_ext3_teardown(struct i2c_client *client,
 }
 
 static int pca9557_teardown(struct i2c_client *client,
-			    unsigned gpio_base, unsigned ngpio,
+			    unsigned int gpio_base, unsigned int ngpio,
 			    void *context)
 {
 	scu_gpio_common_teardown(gpio_base, ngpio, 0x3f);
@@ -1060,19 +1067,19 @@ static void pch_gpio_teardown(struct scu_data *data)
 
 static struct dsa_chip_data switch_chip_data = {
 	.eeprom_len	= 0x200,
-        .port_names[0]	= "cpu",
-        .port_names[1]	= "port1",
-        .port_names[2]	= "port2",
-        .port_names[3]	= "port3",
-        .port_names[4]	= "host2esb",
-        .port_names[5]	= 0,	/* unused */
+	.port_names[0]	= "cpu",
+	.port_names[1]	= "port1",
+	.port_names[2]	= "port2",
+	.port_names[3]	= "port3",
+	.port_names[4]	= "host2esb",
+	.port_names[5]	= 0,	/* unused */
 };
 
 static void scu_setup_ethernet_switch(struct scu_data *data)
 {
 	struct dsa_platform_data switch_data = {
-        	.nr_chips = 1,
-        	.chip = &switch_chip_data,
+		.nr_chips = 1,
+		.chip = &switch_chip_data,
 	};
 
 	switch_data.netdev = &data->netdev->dev;
@@ -1275,6 +1282,7 @@ static void populate_unit_info(struct nvmem_device *nvmem,
 	/* Update platform data based on part number retrieved from EEPROM */
 	for (i = 0; i < ARRAY_SIZE(scu_platform_data); i++) {
 		const struct scu_platform_data *tpdata = &scu_platform_data[i];
+
 		if (tpdata->lru_part_number == NULL)
 			continue;
 		if (!strncmp(data->eeprom.lru_part_number,
@@ -1608,6 +1616,7 @@ static int __init scu_init(void)
 
 	return platform_driver_register(&scu_driver);
 }
+module_init(scu_init);
 
 static void __exit scu_exit(void)
 {
@@ -1616,9 +1625,9 @@ static void __exit scu_exit(void)
 
 	platform_driver_unregister(&scu_driver);
 }
-
-module_init(scu_init);
 module_exit(scu_exit);
 
 MODULE_ALIAS("platform:scu");
 MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Guenter Roeck");
+MODULE_DESCRIPTION("IMS SCU platform driver");
