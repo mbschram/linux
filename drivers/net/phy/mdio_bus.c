@@ -38,6 +38,8 @@
 
 #include <asm/irq.h>
 
+#include "mdio-boardinfo.h"
+
 int mdiobus_register_device(struct mdio_device *mdiodev)
 {
 	if (mdiodev->bus->mdio_map[mdiodev->addr])
@@ -339,6 +341,8 @@ int __mdiobus_register(struct mii_bus *bus, struct module *owner)
 			}
 		}
 	}
+
+	mdiobus_setup_mdiodev_from_board_info(bus);
 
 	bus->state = MDIOBUS_REGISTERED;
 	pr_info("%s: probed\n", bus->name);
