@@ -120,7 +120,7 @@ static const struct iproc_clk_ctrl lcpll0_clk[] = {
 		.mdiv = REG_VAL(0x8, 24, 8),
 	},
 	[BCM_HR2_LCPLL0_SDIO_CLK] = {
-		.channel = BCM_NSP_LCPLL0_SDIO_CLK,
+		.channel = BCM_HR2_LCPLL0_SDIO_CLK,
 		.flags = IPROC_CLK_AON,
 		.enable = ENABLE_VAL(0x0, 7, 4, 10),
 		.mdiv = REG_VAL(0x8, 16, 8),
