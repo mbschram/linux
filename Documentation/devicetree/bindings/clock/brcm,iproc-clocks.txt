@@ -137,6 +137,37 @@ These clock IDs are defined in:
     ch1_audio  audiopll         2       BCM_CYGNUS_AUDIOPLL_CH1
     ch2_audio  audiopll         3       BCM_CYGNUS_AUDIOPLL_CH2
 
+Hurricane 2
+------
+PLL and leaf clock compatible strings for Hurricane 2 are:
+ "brcm,hr2-armpll"
+ "brcm,hr2-genpll"
+ "brcm,hr2-lcpll0"
+
+The following table defines the set of PLL/clock index and ID for Hurricane 2.
+These clock IDs are defined in:
+    "include/dt-bindings/clock/bcm-hr2.h"
+
+    Clock	Source		Index	ID
+    ---		-----		-----	---------
+    crystal	N/A		N/A	N/A
+
+    armpll	crystal		N/A	N/A
+
+    genpll	crystal		0	BCM_HR2_GENPLL
+    phy		genpll		1	BCM_HR2_GENPLL_PHY_CLK
+    ethernetclk	genpll		2	BCM_HR2_GENPLL_ENET_SW_CLK
+    usbclk	genpll		3	BCM_HR2_GENPLL_USB_PHY_REF_CLK
+    iprocfast	genpll		4	BCM_HR2_GENPLL_IPROCFAST_CLK
+    sata1	genpll		5	BCM_HR2_GENPLL_SATA1_CLK
+    sata2	genpll		6	BCM_HR2_GENPLL_SATA2_CLK
+
+    lcpll0	crystal		0	BCM_HR2_LCPLL0
+    pcie_phy	lcpll0		1	BCM_HR2_LCPLL0_PCIE_PHY_REF_CLK
+    sdio	lcpll0		2	BCM_HR2_LCPLL0_SDIO_CLK
+    ddr_phy	lcpll0		3	BCM_HR2_LCPLL0_DDR_PHY_CLK
+
+
 Northstar and Northstar Plus
 ------
 PLL and leaf clock compatible strings for Northstar and Northstar Plus are:
