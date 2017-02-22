@@ -10,6 +10,7 @@ TEST_GEN_FILES =  socket
 TEST_GEN_FILES += psock_fanout psock_tpacket
 TEST_GEN_FILES += reuseport_bpf reuseport_bpf_cpu reuseport_bpf_numa
 TEST_GEN_FILES += reuseport_dualstack
+TEST_GEN_FILES += snd_zerocopy snd_zerocopy_lo
 
 include ../lib.mk
 
