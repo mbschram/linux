@@ -61,9 +61,10 @@ static void bcm_sf2_imp_vlan_setup(struct dsa_switch *ds, int cpu_port)
 	}
 }
 
-static void bcm_sf2_brcm_hdr_setup(struct bcm_sf2_priv *priv, int port)
+static void bcm_sf2_brcm_hdr_setup(struct dsa_switch *ds, int port)
 {
 	bool tagging = ds->ops->get_tag_protocol(ds) == DSA_TAG_PROTO_BRCM;
+	struct bcm_sf2_priv *priv = bcm_sf2_to_priv(ds);
 	u32 reg, val;
 
 	/* Resolve which bit controls the Broadcom tag */
@@ -140,7 +141,7 @@ static void bcm_sf2_imp_setup(struct dsa_switch *ds, int port)
 	reg |= MII_DUMB_FWDG_EN;
 	core_writel(priv, reg, CORE_SWITCH_CTRL);
 
-	bcm_sf2_brcm_hdr_setup(priv, port);
+	bcm_sf2_brcm_hdr_setup(ds, port);
 
 	/* Force link status for IMP port */
 	reg = core_readl(priv, offset);
@@ -249,7 +250,7 @@ static int bcm_sf2_port_setup(struct dsa_switch *ds, int port,
 
 	/* Enable Broadcom tags for that port if requested */
 	if (priv->brcm_tag_mask & BIT(port))
-		bcm_sf2_brcm_hdr_setup(priv, port);
+		bcm_sf2_brcm_hdr_setup(ds, port);
 
 	/* Configure Traffic Class to QoS mapping, allow each priority to map
 	 * to a different queue number
