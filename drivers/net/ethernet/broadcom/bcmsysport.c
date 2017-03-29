@@ -1135,19 +1135,71 @@ static struct sk_buff *bcm_sysport_insert_tsb(struct sk_buff *skb,
 	return skb;
 }
 
+static int bcm_sysport_xmit_single(struct sk_buff *skb,
+				   struct bcm_sysport_tx_ring *ring)
+{
+	struct bcm_sysport_priv *priv = ring->priv;
+	struct device *kdev = &priv->pdev->dev;
+	struct net_device *dev = priv->netdev;
+	struct bcm_sysport_cb *cb;
+	struct dma_desc *desc;
+	unsigned int skb_len;
+	dma_addr_t mapping;
+	u32 len_status;
+
+	skb_len = skb->len;
+
+	mapping = dma_map_single(kdev, skb->data, skb_len, DMA_TO_DEVICE);
+	if (dma_mapping_error(kdev, mapping)) {
+		priv->mib.tx_dma_failed++;
+		netif_err(priv, tx_err, dev, "DMA map failed at %p (len=%d)\n",
+			  skb->data, skb_len);
+		return -ENOMEM;
+	}
+
+	/* Remember the SKB for future freeing */
+	cb = &ring->cbs[ring->curr_desc];
+	cb->skb = skb;
+	dma_unmap_addr_set(cb, dma_addr, mapping);
+	dma_unmap_len_set(cb, dma_len, skb_len);
+
+	/* Fetch a descriptor entry from our pool */
+	desc = ring->desc_cpu;
+
+	desc->addr_lo = lower_32_bits(mapping);
+	len_status = upper_32_bits(mapping) & DESC_ADDR_HI_MASK;
+	len_status |= (skb_len << DESC_LEN_SHIFT);
+	len_status |= (DESC_SOP | DESC_EOP | TX_STATUS_APP_CRC) <<
+		       DESC_STATUS_SHIFT;
+	if (skb->ip_summed == CHECKSUM_PARTIAL)
+		len_status |= (DESC_L4_CSUM << DESC_STATUS_SHIFT);
+
+	ring->curr_desc++;
+	if (ring->curr_desc == ring->size)
+		ring->curr_desc = 0;
+	ring->desc_count--;
+
+	/* Ensure write completion of the descriptor status/length
+	 * in DRAM before the System Port WRITE_PORT register latches
+	 * the value
+	 */
+	wmb();
+	desc->addr_status_len = len_status;
+	wmb();
+
+	/* Write this descriptor address to the RING write port */
+	tdma_port_write_desc_addr(priv, desc, ring->index);
+
+	return 0;
+}
+
 static netdev_tx_t bcm_sysport_xmit(struct sk_buff *skb,
 				    struct net_device *dev)
 {
 	struct bcm_sysport_priv *priv = netdev_priv(dev);
-	struct device *kdev = &priv->pdev->dev;
 	struct bcm_sysport_tx_ring *ring;
-	struct bcm_sysport_cb *cb;
 	struct netdev_queue *txq;
-	struct dma_desc *desc;
-	unsigned int skb_len;
 	unsigned long flags;
-	dma_addr_t mapping;
-	u32 len_status;
 	u16 queue;
 	int ret;
 
@@ -1185,49 +1237,11 @@ static netdev_tx_t bcm_sysport_xmit(struct sk_buff *skb,
 		}
 	}
 
-	skb_len = skb->len;
-
-	mapping = dma_map_single(kdev, skb->data, skb_len, DMA_TO_DEVICE);
-	if (dma_mapping_error(kdev, mapping)) {
-		priv->mib.tx_dma_failed++;
-		netif_err(priv, tx_err, dev, "DMA map failed at %p (len=%d)\n",
-			  skb->data, skb_len);
+	ret = bcm_sysport_xmit_single(skb, ring);
+	if (ret) {
 		ret = NETDEV_TX_OK;
 		goto out;
 	}
-
-	/* Remember the SKB for future freeing */
-	cb = &ring->cbs[ring->curr_desc];
-	cb->skb = skb;
-	dma_unmap_addr_set(cb, dma_addr, mapping);
-	dma_unmap_len_set(cb, dma_len, skb_len);
-
-	/* Fetch a descriptor entry from our pool */
-	desc = ring->desc_cpu;
-
-	desc->addr_lo = lower_32_bits(mapping);
-	len_status = upper_32_bits(mapping) & DESC_ADDR_HI_MASK;
-	len_status |= (skb_len << DESC_LEN_SHIFT);
-	len_status |= (DESC_SOP | DESC_EOP | TX_STATUS_APP_CRC) <<
-		       DESC_STATUS_SHIFT;
-	if (skb->ip_summed == CHECKSUM_PARTIAL)
-		len_status |= (DESC_L4_CSUM << DESC_STATUS_SHIFT);
-
-	ring->curr_desc++;
-	if (ring->curr_desc == ring->size)
-		ring->curr_desc = 0;
-	ring->desc_count--;
-
-	/* Ensure write completion of the descriptor status/length
-	 * in DRAM before the System Port WRITE_PORT register latches
-	 * the value
-	 */
-	wmb();
-	desc->addr_status_len = len_status;
-	wmb();
-
-	/* Write this descriptor address to the RING write port */
-	tdma_port_write_desc_addr(priv, desc, ring->index);
 
 	/* Check ring space and update SW control flow */
 	if (ring->desc_count == 0)
