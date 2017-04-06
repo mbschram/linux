@@ -261,6 +261,49 @@ enum phy_tunable_id {
 	__ETHTOOL_PHY_TUNABLE_COUNT,
 };
 
+enum ethtool_cable_pair_status {
+	ETHTOOL_CABLE_PAIR_STATUS_NOT_TESTED,
+	ETHTOOL_CABLE_PAIR_STATUS_GOOD,
+	ETHTOOL_CABLE_PAIR_STATUS_SHORT,
+	ETHTOOL_CABLE_PAIR_STATUS_OPEN,
+	ETHTOOL_CABLE_PAIR_STATUS_BROKEN,
+	__ETHTOOL_CABLE_PAIR_TSTATUS_COUNT,
+};
+
+/**
+ * struct ethtool_pair_diags - per-pair cable diagnostics
+ * @version: Indicates cable diagnostics version
+ * @status: Pair status = %ethtool_cable_status
+ * @distance: Cable distance in meters
+ */
+struct ethtool_pair_diags {
+	__u32 version;
+	enum ethtool_cable_pair_status status;
+	u8 distance;
+};
+
+enum ethtool_cable_action {
+	ETHTOOL_CABLE_ACTION_RUN,
+	ETHTOOL_CABLE_ACTION_STOP,
+	__ETHTOOL_CABLE_ACTION_COUNT,
+};
+
+#define ETHTOOL_CABLE_DIAGS_NUM_PAIRS	4
+
+/**
+ * struct ethtool_cable_diags - cable diagnostics dump
+ * @cmd: Command number = %ETHTOOL_GCABLEDIAGS or %ETHTOOL_SCABLEDIAGS
+ * @action: Action to perform
+ * @pairs_mask: Target a specific set of pairs (0-0xf)
+ * @pairs_status: Per-pair cable diagnostics results
+ */
+struct ethtool_cable_diags {
+	__u32	cmd;
+	__u32	action;
+	u8	pairs_mask;
+	struct ethtool_pair_diags pairs_status[ETHTOOL_CABLE_DIAGS_NUM_PAIRS];
+};
+
 /**
  * struct ethtool_regs - hardware register dump
  * @cmd: Command number = %ETHTOOL_GREGS
@@ -1373,6 +1416,8 @@ enum ethtool_fec_config_bits {
 #define ETHTOOL_PHY_STUNABLE	0x0000004f /* Set PHY tunable configuration */
 #define ETHTOOL_GFECPARAM	0x00000050 /* Get FEC settings */
 #define ETHTOOL_SFECPARAM	0x00000051 /* Set FEC settings */
+#define ETHTOOL_GCABLEDIAGS	0x00000052 /* Get ethtool cable diagnostics */
+#define ETHTOOL_SCABLEDIAGS	0x00000053 /* Set ethtool cable diagnostics */
 
 /* compatibility with older code */
 #define SPARC_ETH_GSET		ETHTOOL_GSET

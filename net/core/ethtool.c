@@ -2556,6 +2556,36 @@ static int ethtool_set_fecparam(struct net_device *dev, void __user *useraddr)
 	return dev->ethtool_ops->set_fecparam(dev, &fecparam);
 }
 
+static int ethtool_get_cable_diags(struct net_device *dev, void __user *useraddr)
+{
+	struct ethtool_cable_diags diags = { .cmd = ETHTOOL_GCABLEDIAGS };
+	const struct ethtool_ops *ops = dev->ethtool_ops;
+
+	if (!ops->get_cable_diags)
+		return -EOPNOTSUPP;
+
+	ops->get_cable_diags(dev, &diags);
+
+	if (copy_to_user(useraddr, &diags, sizeof(diags)))
+		return -EFAULT;
+
+	return 0;
+}
+
+static int ethtool_set_cable_diags(struct net_device *dev, void __user *useraddr)
+{
+	const struct ethtool_ops *ops = dev->ethtool_ops;
+	struct ethtool_cable_diags diags;
+
+	if (!ops->set_cable_diags)
+		return -EOPNOTSUPP;
+
+	if (copy_from_user(&diags, useraddr, sizeof(diags)))
+		return -EFAULT;
+
+	return ops->set_cable_diags(dev, &diags);
+}
+
 /* The main entry point in this file.  Called from net/core/dev_ioctl.c */
 
 int dev_ethtool(struct net *net, struct ifreq *ifr)
@@ -2824,11 +2854,19 @@ int dev_ethtool(struct net *net, struct ifreq *ifr)
 	case ETHTOOL_PHY_STUNABLE:
 		rc = set_phy_tunable(dev, useraddr);
 		break;
+<<<<<<< HEAD
 	case ETHTOOL_GFECPARAM:
 		rc = ethtool_get_fecparam(dev, useraddr);
 		break;
 	case ETHTOOL_SFECPARAM:
 		rc = ethtool_set_fecparam(dev, useraddr);
+=======
+	case ETHTOOL_GCABLEDIAGS:
+		rc = ethtool_get_cable_diags(dev, useraddr);
+		break;
+	case ETHTOOL_SCABLEDIAGS:
+		rc = ethtool_set_cable_diags(dev, useraddr);
+>>>>>>> 767a42731b9f... net: ethtool: Add support for cable diagnostics
 		break;
 	default:
 		rc = -EOPNOTSUPP;

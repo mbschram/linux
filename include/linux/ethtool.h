@@ -309,6 +309,8 @@ bool ethtool_convert_link_mode_to_legacy_u32(u32 *legacy_u32,
  *	fields should be ignored (use %__ETHTOOL_LINK_MODE_MASK_NBITS
  *	instead of the latter), any change to them will be overwritten
  *	by kernel. Returns a negative error code or zero.
+ * @get_cable_diags: Get cable diagnostics
+ * @set_cable_Diags: Set cable diagnostics
  *
  * All operations are optional (i.e. the function pointer may be set
  * to %NULL) and callers must take this into account.  Callers must
@@ -399,5 +401,9 @@ struct ethtool_ops {
 				      struct ethtool_fecparam *);
 	int	(*set_fecparam)(struct net_device *,
 				      struct ethtool_fecparam *);
+	int	(*get_cable_diags)(struct net_device *,
+				   struct ethtool_cable_diags *);
+	int	(*set_cable_diags)(struct net_device *,
+				   const struct ethtool_cable_diags *);
 };
 #endif /* _LINUX_ETHTOOL_H */
