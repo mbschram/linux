@@ -654,6 +654,12 @@ struct phy_driver {
 			    struct ethtool_tunable *tuna,
 			    const void *data);
 	int (*set_loopback)(struct phy_device *dev, bool enable);
+
+	/* Get and set cable diagnostics */
+	int (*get_cable_diags)(struct phy_device *dev,
+			       struct ethtool_cable_diags *diags);
+	int (*set_cable_diags)(struct phy_device *dev,
+			       const struct ethtool_cable_diags *diags);
 };
 #define to_phy_driver(d) container_of(to_mdio_common_driver(d),		\
 				      struct phy_driver, mdiodrv)
@@ -933,6 +939,10 @@ int phy_ethtool_get_link_ksettings(struct net_device *ndev,
 int phy_ethtool_set_link_ksettings(struct net_device *ndev,
 				   const struct ethtool_link_ksettings *cmd);
 int phy_ethtool_nway_reset(struct net_device *ndev);
+int phy_ethtool_get_cable_diags(struct net_device *ndev,
+				struct ethtool_cable_diags *diags);
+int phy_ethtool_set_cable_diags(struct net_device *ndev,
+				const struct ethtool_cable_diags *diags);
 
 #if IS_ENABLED(CONFIG_PHYLIB)
 int __init mdio_bus_init(void);

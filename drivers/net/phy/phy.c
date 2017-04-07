@@ -1325,3 +1325,39 @@ int phy_ethtool_nway_reset(struct net_device *ndev)
 	return phy_restart_aneg(phydev);
 }
 EXPORT_SYMBOL(phy_ethtool_nway_reset);
+
+int phy_ethtool_set_cable_diags(struct net_device *ndev,
+				const struct ethtool_cable_diags *diags)
+{
+	struct phy_device *phydev = ndev->phydev;
+
+	if (!phydev)
+		return -ENODEV;
+
+	if (phydev->interface == PHY_INTERFACE_MODE_MOCA)
+		return -EOPNOTSUPP;
+
+	if (!phydev->drv)
+		return -EIO;
+
+	return phydev->drv->set_cable_diags(phydev, diags);
+}
+EXPORT_SYMBOL(phy_ethtool_set_cable_diags);
+
+int phy_ethtool_get_cable_diags(struct net_device *ndev,
+				struct ethtool_cable_diags *diags)
+{
+	struct phy_device *phydev = ndev->phydev;
+
+	if (!phydev)
+		return -ENODEV;
+
+	if (phydev->interface == PHY_INTERFACE_MODE_MOCA)
+		return -EOPNOTSUPP;
+
+	if (!phydev->drv)
+		return -EIO;
+
+	return phydev->drv->get_cable_diags(phydev, diags);
+}
+EXPORT_SYMBOL(phy_ethtool_get_cable_diags);
