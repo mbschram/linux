@@ -905,6 +905,18 @@ static int dsa_slave_set_rxnfc(struct net_device *dev,
 	return ds->ops->set_rxnfc(ds, dp->index, nfc);
 }
 
+static int dsa_slave_get_cable_diags(struct net_device *dev,
+				     struct ethtool_cable_diags *diags)
+{
+	return phy_ethtool_get_cable_diags(dev, diags);
+}
+
+static int dsa_slave_set_cable_diags(struct net_device *dev,
+				     const struct ethtool_cable_diags *diags)
+{
+	return phy_ethtool_set_cable_diags(dev, diags);
+}
+
 static const struct ethtool_ops dsa_slave_ethtool_ops = {
 	.get_drvinfo		= dsa_slave_get_drvinfo,
 	.get_regs_len		= dsa_slave_get_regs_len,
@@ -925,6 +937,8 @@ static const struct ethtool_ops dsa_slave_ethtool_ops = {
 	.set_link_ksettings	= phy_ethtool_set_link_ksettings,
 	.get_rxnfc		= dsa_slave_get_rxnfc,
 	.set_rxnfc		= dsa_slave_set_rxnfc,
+	.get_cable_diags	= dsa_slave_get_cable_diags,
+	.set_cable_diags	= dsa_slave_set_cable_diags,
 };
 
 static const struct net_device_ops dsa_slave_netdev_ops = {
