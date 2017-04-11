@@ -203,17 +203,15 @@ static int bcm_sysport_set_rx_sw_tag(struct net_device *dev,
 static int bcm_sysport_set_features(struct net_device *dev,
 				    netdev_features_t features)
 {
-	netdev_features_t changed = features ^ dev->features;
-	netdev_features_t wanted = dev->wanted_features;
 	int ret = 0;
 
-	if (changed & (NETIF_F_RXCSUM | NETIF_F_HW_SWITCH_TAG_RX))
-		ret = bcm_sysport_set_rx_csum(dev, wanted);
-	if (changed & (NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM |
+	if (features & (NETIF_F_RXCSUM | NETIF_F_HW_SWITCH_TAG_RX))
+		ret = bcm_sysport_set_rx_csum(dev, features);
+	if (features & (NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM |
 		       NETIF_F_HW_SWITCH_TAG_TX))
-		ret = bcm_sysport_set_tx_csum(dev, wanted);
-	if (changed & NETIF_F_HW_SWITCH_TAG_RX)
-		ret = bcm_sysport_set_rx_sw_tag(dev, wanted);
+		ret = bcm_sysport_set_tx_csum(dev, features);
+	if (features & NETIF_F_HW_SWITCH_TAG_RX)
+		ret = bcm_sysport_set_rx_sw_tag(dev, features);
 
 	return ret;
 }
@@ -1755,6 +1753,9 @@ static void bcm_sysport_netif_start(struct net_device *dev)
 {
 	struct bcm_sysport_priv *priv = netdev_priv(dev);
 
+	/* Turn features on at the HW level */
+	bcm_sysport_set_features(dev, dev->features);
+
 	/* Enable NAPI */
 	napi_enable(&priv->napi);
 
@@ -2140,11 +2141,12 @@ static int bcm_sysport_probe(struct platform_device *pdev)
 	dev->netdev_ops = &bcm_sysport_netdev_ops;
 	netif_napi_add(dev, &priv->napi, bcm_sysport_poll, 64);
 
-	/* HW supported features, none enabled by default */
-	dev->hw_features |= NETIF_F_RXCSUM | NETIF_F_HIGHDMA |
-				NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM |
-				NETIF_F_HW_SWITCH_TAG_RX |
-				NETIF_F_HW_SWITCH_TAG_TX;
+	dev->features |= NETIF_F_RXCSUM | NETIF_F_HIGHDMA |
+			 NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM;
+	dev->vlan_features |= dev->features;
+	dev->hw_features = dev->features |
+			   NETIF_F_HW_SWITCH_TAG_RX |
+			   NETIF_F_HW_SWITCH_TAG_TX;
 
 	/* Request the WOL interrupt and advertise suspend if available */
 	priv->wol_irq_disabled = 1;
