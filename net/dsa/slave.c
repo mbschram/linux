@@ -1228,9 +1228,18 @@ static bool dsa_slave_dev_check(struct net_device *dev)
 static int dsa_slave_changeupper(struct net_device *dev,
 				 struct netdev_notifier_changeupper_info *info)
 {
-	struct dsa_slave_priv *p = netdev_priv(dev);
-	struct dsa_port *dp = p->dp;
+	struct dsa_switch_tree *dst;
+	struct dsa_slave_priv *p;
+	struct dsa_port *dp;
 	int err = NOTIFY_DONE;
+
+	if (!dev->dsa_ptr) {
+		p = netdev_priv(dev);
+		dp = p->dp;
+	} else {
+		dst = dev->dsa_ptr;
+		dp = dsa_dst_get_cpu_dp(dst, dev);
+	}
 
 	if (netif_is_bridge_master(info->upper_dev)) {
 		if (info->linking) {
@@ -1250,7 +1259,7 @@ static int dsa_slave_netdevice_event(struct notifier_block *nb,
 {
 	struct net_device *dev = netdev_notifier_info_to_dev(ptr);
 
-	if (dev->netdev_ops != &dsa_slave_netdev_ops)
+	if (dev->netdev_ops != &dsa_slave_netdev_ops && !dev->dsa_ptr)
 		return NOTIFY_DONE;
 
 	if (event == NETDEV_CHANGEUPPER)
