@@ -188,9 +188,16 @@ static inline struct net_device *dsa_master_netdev(struct dsa_slave_priv *p)
 	return p->dp->cpu_dp->netdev;
 }
 
-static inline struct dsa_port *dsa_dst_get_cpu_dp(struct dsa_switch_tree *dst)
+static inline struct dsa_port *dsa_dst_get_cpu_dp(struct dsa_switch_tree *dst,
+						  struct net_device *dev)
 {
-	return dst->cpu_dp;
+	unsigned int i;
+
+	for (i = 0; i < DSA_MAX_PORTS; i++) {
+		if (dst->cpu_dp[i] && dst->cpu_dp[i]->netdev == dev)
+			return dst->cpu_dp[i];
+	}
+	return NULL;
 }
 
 #endif

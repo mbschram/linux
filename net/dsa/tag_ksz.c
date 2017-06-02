@@ -75,7 +75,7 @@ static struct sk_buff *ksz_rcv(struct sk_buff *skb, struct net_device *dev,
 			       struct net_device *orig_dev)
 {
 	struct dsa_switch_tree *dst = dev->dsa_ptr;
-	struct dsa_port *cpu_dp = dsa_dst_get_cpu_dp(dst);
+	struct dsa_port *cpu_dp = dsa_dst_get_cpu_dp(dst, dev);
 	struct dsa_switch *ds = cpu_dp->ds;
 	u8 *tag;
 	int source_port;

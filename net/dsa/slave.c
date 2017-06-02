@@ -519,7 +519,7 @@ static void dsa_cpu_port_get_ethtool_stats(struct net_device *dev,
 					   uint64_t *data)
 {
 	struct dsa_switch_tree *dst = dev->dsa_ptr;
-	struct dsa_port *cpu_dp = dsa_dst_get_cpu_dp(dst);
+	struct dsa_port *cpu_dp = dsa_dst_get_cpu_dp(dst, dev);
 	struct dsa_switch *ds = cpu_dp->ds;
 	s8 cpu_port = cpu_dp->index;
 	int count = 0;
@@ -536,7 +536,7 @@ static void dsa_cpu_port_get_ethtool_stats(struct net_device *dev,
 static int dsa_cpu_port_get_sset_count(struct net_device *dev, int sset)
 {
 	struct dsa_switch_tree *dst = dev->dsa_ptr;
-	struct dsa_port *cpu_dp = dsa_dst_get_cpu_dp(dst);
+	struct dsa_port *cpu_dp = dsa_dst_get_cpu_dp(dst, dev);
 	struct dsa_switch *ds = cpu_dp->ds;
 	int count = 0;
 
@@ -553,7 +553,7 @@ static void dsa_cpu_port_get_strings(struct net_device *dev,
 				     uint32_t stringset, uint8_t *data)
 {
 	struct dsa_switch_tree *dst = dev->dsa_ptr;
-	struct dsa_port *cpu_dp = dsa_dst_get_cpu_dp(dst);
+	struct dsa_port *cpu_dp = dsa_dst_get_cpu_dp(dst, dev);
 	struct dsa_switch *ds = cpu_dp->ds;
 	s8 cpu_port = cpu_dp->index;
 	int len = ETH_GSTRING_LEN;
@@ -1143,7 +1143,7 @@ int dsa_slave_create(struct dsa_switch *ds, struct device *parent,
 	struct dsa_port *cpu_dp;
 	int ret;
 
-	cpu_dp = ds->dst->cpu_dp;
+	cpu_dp = dsa_ds_get_cpu_dp(ds);
 	master = cpu_dp->netdev;
 
 	slave_dev = alloc_netdev(sizeof(struct dsa_slave_priv), name,

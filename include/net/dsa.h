@@ -132,7 +132,7 @@ struct dsa_switch_tree {
 	/*
 	 * The switch port to which the CPU is attached.
 	 */
-	struct dsa_port		*cpu_dp;
+	struct dsa_port		*cpu_dp[DSA_MAX_PORTS];
 
 	/*
 	 * Data for the individual switch chips.
@@ -269,7 +269,7 @@ static inline struct dsa_port *dsa_ds_get_cpu_dp(struct dsa_switch *ds)
 
 static inline u8 dsa_upstream_port(struct dsa_switch *ds)
 {
-	struct dsa_switch_tree *dst = ds->dst;
+	struct dsa_port *cpu_dp = dsa_ds_get_cpu_dp(ds);
 
 	/*
 	 * If this is the root switch (i.e. the switch that connects
@@ -277,10 +277,10 @@ static inline u8 dsa_upstream_port(struct dsa_switch *ds)
 	 * Else return the (DSA) port number that connects to the
 	 * switch that is one hop closer to the cpu.
 	 */
-	if (dst->cpu_dp->ds == ds)
-		return dst->cpu_dp->index;
+	if (cpu_dp->ds == ds)
+		return cpu_dp->index;
 	else
-		return ds->rtable[dst->cpu_dp->ds->index];
+		return ds->rtable[cpu_dp->ds->index];
 }
 
 struct dsa_switch_ops {

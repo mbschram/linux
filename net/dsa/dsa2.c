@@ -337,9 +337,15 @@ static int dsa_ds_apply(struct dsa_switch_tree *dst, struct dsa_switch *ds)
 		return err;
 
 	if (ds->ops->set_addr) {
-		err = ds->ops->set_addr(ds, dst->cpu_dp->netdev->dev_addr);
-		if (err < 0)
-			return err;
+		for (index = 0; index < DSA_MAX_PORTS; index++) {
+			port = dst->cpu_dp[index];
+			if (!port)
+				continue;
+
+			err = ds->ops->set_addr(ds, port->netdev->dev_addr);
+			if (err < 0)
+				return err;
+		}
 	}
 
 	if (!ds->slave_mii_bus && ds->ops->phy_read) {
@@ -419,6 +425,7 @@ static void dsa_ds_unapply(struct dsa_switch_tree *dst, struct dsa_switch *ds)
 
 static int dsa_dst_apply(struct dsa_switch_tree *dst)
 {
+	struct dsa_port *port;
 	struct dsa_switch *ds;
 	u32 index;
 	int err;
@@ -433,18 +440,23 @@ static int dsa_dst_apply(struct dsa_switch_tree *dst)
 			return err;
 	}
 
-	if (dst->cpu_dp) {
-		err = dsa_cpu_port_ethtool_setup(dst->cpu_dp);
+	for (index = 0; index < DSA_MAX_PORTS; index++) {
+		port = dst->cpu_dp[index];
+		if (!port)
+			continue;
+
+		err = dsa_cpu_port_ethtool_setup(port);
 		if (err)
 			return err;
+
+		/* If we use a tagging format that doesn't have an ethertype
+		 * field, make sure that all packets from this point on get
+		 * sent to the tag format's receive function.
+		 */
+		wmb();
+		port->netdev->dsa_ptr = dst;
 	}
 
-	/* If we use a tagging format that doesn't have an ethertype
-	 * field, make sure that all packets from this point on get
-	 * sent to the tag format's receive function.
-	 */
-	wmb();
-	dst->cpu_dp->netdev->dsa_ptr = dst;
 	dst->applied = true;
 
 	return 0;
@@ -452,19 +464,26 @@ static int dsa_dst_apply(struct dsa_switch_tree *dst)
 
 static void dsa_dst_unapply(struct dsa_switch_tree *dst)
 {
+	struct dsa_port *port;
 	struct dsa_switch *ds;
 	u32 index;
 
 	if (!dst->applied)
 		return;
 
-	dst->cpu_dp->netdev->dsa_ptr = NULL;
+	for (index = 0; index < DSA_MAX_PORTS; index++) {
+		port = dst->cpu_dp[index];
+		if (!port)
+			continue;
 
-	/* If we used a tagging format that doesn't have an ethertype
-	 * field, make sure that all packets from this point get sent
-	 * without the tag and go through the regular receive path.
-	 */
-	wmb();
+		port->netdev->dsa_ptr = NULL;
+
+		/* If we used a tagging format that doesn't have an ethertype
+		 * field, make sure that all packets from this point get sent
+		 * without the tag and go through the regular receive path.
+		 */
+		wmb();
+	}
 
 	for (index = 0; index < DSA_MAX_SWITCHES; index++) {
 		ds = dst->ds[index];
@@ -474,8 +493,13 @@ static void dsa_dst_unapply(struct dsa_switch_tree *dst)
 		dsa_ds_unapply(dst, ds);
 	}
 
-	if (dst->cpu_dp)
-		dsa_cpu_port_ethtool_restore(dst->cpu_dp);
+	for (index = 0; index < DSA_MAX_PORTS; index++) {
+		port = dst->cpu_dp[index];
+		if (!port)
+			continue;
+
+		dsa_cpu_port_ethtool_restore(port);
+	}
 
 	pr_info("DSA: tree %d unapplied\n", dst->tree);
 	dst->applied = false;
@@ -502,9 +526,9 @@ static int dsa_cpu_parse(struct dsa_port *port, u32 index,
 	if (!ethernet_dev)
 		return -EPROBE_DEFER;
 
-	if (!dst->cpu_dp) {
-		dst->cpu_dp = port;
-		dst->cpu_dp->netdev = ethernet_dev;
+	if (!dst->cpu_dp[index]) {
+		dst->cpu_dp[index] = port;
+		dst->cpu_dp[index]->netdev = ethernet_dev;
 	}
 
 	tag_protocol = ds->ops->get_tag_protocol(ds);
@@ -572,7 +596,12 @@ static int dsa_dst_parse(struct dsa_switch_tree *dst)
 			return err;
 	}
 
-	if (!dst->cpu_dp->netdev) {
+	for (index = 0; index < DSA_MAX_PORTS; index++) {
+		if (dst->cpu_dp[index] && dst->cpu_dp[index]->netdev)
+			break;
+	}
+
+	if (index == DSA_MAX_PORTS) {
 		pr_warn("Tree has no master device\n");
 		return -EINVAL;
 	}
