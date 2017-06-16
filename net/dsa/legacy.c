@@ -760,6 +760,7 @@ static SIMPLE_DEV_PM_OPS(dsa_pm_ops, dsa_suspend, dsa_resume);
 
 static const struct of_device_id dsa_of_match_table[] = {
 	{ .compatible = "marvell,dsa", },
+	{ .compatible = "brcm,bcm7445-switch-v4.0", },
 	{}
 };
 MODULE_DEVICE_TABLE(of, dsa_of_match_table);

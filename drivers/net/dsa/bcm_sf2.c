@@ -998,6 +998,210 @@ static const struct of_device_id bcm_sf2_of_match[] = {
 };
 MODULE_DEVICE_TABLE(of, bcm_sf2_of_match);
 
+static int bcm_sf2_sw_legacy_setup(struct dsa_switch *ds)
+{
+	const char *reg_names[BCM_SF2_REGS_NUM] = BCM_SF2_REGS_NAME;
+	struct bcm_sf2_priv *priv = bcm_sf2_to_priv(ds);
+	struct device_node *dn;
+	void __iomem **base;
+	unsigned int i;
+	u32 reg, rev;
+	int ret;
+
+	dn = ds->cd->of_node->parent;
+
+	spin_lock_init(&priv->indir_lock);
+	mutex_init(&priv->stats_mutex);
+	mutex_init(&priv->cfp.lock);
+
+	/* CFP rule #0 cannot be used for specific classifications, flag it as
+	 * permanently used
+	 */
+	set_bit(0, priv->cfp.used);
+
+	bcm_sf2_identify_ports(priv, dn->child);
+
+	priv->irq0 = irq_of_parse_and_map(dn, 0);
+	priv->irq1 = irq_of_parse_and_map(dn, 1);
+
+	base = &priv->core;
+	for (i = 0; i < BCM_SF2_REGS_NUM; i++) {
+		*base = of_iomap(dn, i);
+		if (IS_ERR(*base)) {
+			pr_err("unable to find register: %s\n", reg_names[i]);
+			return PTR_ERR(*base);
+		}
+		base++;
+	}
+
+	ret = bcm_sf2_sw_rst(priv);
+	if (ret) {
+		pr_err("unable to software reset switch: %d\n", ret);
+		return ret;
+	}
+
+	ret = bcm_sf2_mdio_register(ds);
+	if (ret) {
+		pr_err("failed to register MDIO bus\n");
+		return ret;
+	}
+
+	ret = bcm_sf2_cfp_rst(priv);
+	if (ret) {
+		pr_err("failed to reset CFP\n");
+		goto out_mdio;
+	}
+
+	/* Disable all interrupts and request them */
+	bcm_sf2_intr_disable(priv);
+
+	ret = request_irq(priv->irq0, bcm_sf2_switch_0_isr, 0,
+			  "switch_0", priv);
+	if (ret < 0) {
+		pr_err("failed to request switch_0 IRQ\n");
+		goto out_mdio;
+	}
+
+	ret = request_irq(priv->irq1, bcm_sf2_switch_1_isr, 0,
+			  "switch_1", priv);
+	if (ret < 0) {
+		pr_err("failed to request switch_1 IRQ\n");
+		goto out_mdio;
+	}
+
+	/* Reset the MIB counters */
+	reg = core_readl(priv, CORE_GMNCFGCFG);
+	reg |= RST_MIB_CNT;
+	core_writel(priv, reg, CORE_GMNCFGCFG);
+	reg &= ~RST_MIB_CNT;
+	core_writel(priv, reg, CORE_GMNCFGCFG);
+
+	/* Get the maximum number of ports for this switch */
+	priv->hw_params.num_ports = core_readl(priv, CORE_IMP0_PRT_ID) + 1;
+	if (priv->hw_params.num_ports > DSA_MAX_PORTS)
+		priv->hw_params.num_ports = DSA_MAX_PORTS;
+
+	/* Assume a single GPHY setup if we can't read that property */
+	if (of_property_read_u32(dn, "brcm,num-gphy",
+				 &priv->hw_params.num_gphy))
+		priv->hw_params.num_gphy = 1;
+
+	rev = reg_readl(priv, REG_SWITCH_REVISION);
+	priv->hw_params.top_rev = (rev >> SWITCH_TOP_REV_SHIFT) &
+					SWITCH_TOP_REV_MASK;
+	priv->hw_params.core_rev = (rev & SF2_REV_MASK);
+
+	rev = reg_readl(priv, REG_PHY_REVISION);
+	priv->hw_params.gphy_rev = rev & PHY_REVISION_MASK;
+
+	ret = b53_switch_register(priv->dev);
+	if (ret)
+		goto out_mdio;
+
+	ret = bcm_sf2_sw_setup(ds);
+	if (ret)
+		goto out_mdio;
+
+	pr_info("Starfighter 2 top: %x.%02x, core: %x.%02x base: 0x%p, IRQs: %d, %d\n",
+		priv->hw_params.top_rev >> 8, priv->hw_params.top_rev & 0xff,
+		priv->hw_params.core_rev >> 8, priv->hw_params.core_rev & 0xff,
+		priv->core, priv->irq0, priv->irq1);
+
+	return 0;
+
+out_mdio:
+	bcm_sf2_mdio_unregister(priv);
+	return ret;
+}
+
+static const char *bcm_sf2_sw_drv_probe(struct device *dsa_dev,
+					struct device *host_dev, int sw_addr,
+					void **_priv)
+{
+	const struct of_device_id *of_id = NULL;
+	const struct bcm_sf2_of_data *data;
+	struct b53_platform_data *pdata;
+	struct bcm_sf2_priv *priv;
+	struct b53_device *dev;
+	struct device_node *dn;
+
+	dev_info(host_dev, "full node: %s\n", host_dev->of_node->parent->child->full_name);
+
+	dn = host_dev->of_node->parent->child;
+
+	priv = devm_kzalloc(dsa_dev, sizeof(*priv), GFP_KERNEL);
+	if (!priv)
+		return NULL;
+
+	dev = b53_switch_alloc(dsa_dev, &bcm_sf2_io_ops, priv);
+	if (!dev)
+		return NULL;
+
+	*_priv = dev;
+
+	priv->dev = dev;
+
+	pdata = devm_kzalloc(dsa_dev, sizeof(*pdata), GFP_KERNEL);
+	if (!pdata)
+		return NULL;
+
+	of_id = of_match_node(bcm_sf2_of_match, dn);
+	if (!of_id || !of_id->data)
+		return NULL;
+
+	data = of_id->data;
+
+	/* Set SWITCH_REG register offsets and SWITCH_CORE align factor */
+	priv->type = data->type;
+	priv->reg_offsets = data->reg_offsets;
+	priv->core_reg_align = data->core_reg_align;
+
+	/* Auto-detection using standard registers will not work, so
+	 * provide an indication of what kind of device we are for
+	 * b53_common to work with
+	 */
+	pdata->chip_id = priv->type;
+	dev->pdata = pdata;
+
+	return "Broadcom Starfighter 2";
+}
+
+static const struct dsa_switch_ops bcm_sf2_legacy_ops = {
+	.probe			= bcm_sf2_sw_drv_probe,
+	.get_tag_protocol	= bcm_sf2_sw_get_tag_protocol,
+	.setup			= bcm_sf2_sw_legacy_setup,
+	.get_strings		= b53_get_strings,
+	.get_ethtool_stats	= b53_get_ethtool_stats,
+	.get_sset_count		= b53_get_sset_count,
+	.get_phy_flags		= bcm_sf2_sw_get_phy_flags,
+	.adjust_link		= bcm_sf2_sw_adjust_link,
+	.fixed_link_update	= bcm_sf2_sw_fixed_link_update,
+	.suspend		= bcm_sf2_sw_suspend,
+	.resume			= bcm_sf2_sw_resume,
+	.get_wol		= bcm_sf2_sw_get_wol,
+	.set_wol		= bcm_sf2_sw_set_wol,
+	.port_enable		= bcm_sf2_port_setup,
+	.port_disable		= bcm_sf2_port_disable,
+	.get_mac_eee		= b53_get_mac_eee,
+	.set_mac_eee		= b53_set_mac_eee,
+	.port_bridge_join	= b53_br_join,
+	.port_bridge_leave	= b53_br_leave,
+	.port_stp_state_set	= b53_br_set_stp_state,
+	.port_fast_age		= b53_br_fast_age,
+	.port_vlan_filtering	= b53_vlan_filtering,
+	.port_vlan_prepare	= b53_vlan_prepare,
+	.port_vlan_add		= b53_vlan_add,
+	.port_vlan_del		= b53_vlan_del,
+	.port_fdb_dump		= b53_fdb_dump,
+	.port_fdb_add		= b53_fdb_add,
+	.port_fdb_del		= b53_fdb_del,
+	.get_rxnfc		= bcm_sf2_get_rxnfc,
+	.set_rxnfc		= bcm_sf2_set_rxnfc,
+	.port_mirror_add	= b53_mirror_add,
+	.port_mirror_del	= b53_mirror_del,
+};
+
+
 static int bcm_sf2_sw_probe(struct platform_device *pdev)
 {
 	const char *reg_names[BCM_SF2_REGS_NUM] = BCM_SF2_REGS_NAME;
@@ -1219,7 +1423,24 @@ static struct platform_driver bcm_sf2_driver = {
 		.pm = &bcm_sf2_pm_ops,
 	},
 };
-module_platform_driver(bcm_sf2_driver);
+
+static struct dsa_switch_driver bcm_sf2_sw_drv = {
+	.ops	= &bcm_sf2_legacy_ops,
+};
+
+static int __init bcm_sf2_init(void)
+{
+	register_switch_driver(&bcm_sf2_sw_drv);
+	return platform_driver_register(&bcm_sf2_driver);
+}
+module_init(bcm_sf2_init);
+
+static void __exit bcm_sf2_exit(void)
+{
+	platform_driver_unregister(&bcm_sf2_driver);
+	unregister_switch_driver(&bcm_sf2_sw_drv);
+}
+module_exit(bcm_sf2_exit);
 
 MODULE_AUTHOR("Broadcom Corporation");
 MODULE_DESCRIPTION("Driver for Broadcom Starfighter 2 ethernet switch chip");
