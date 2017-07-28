@@ -594,6 +594,9 @@ void phy_stop_machine(struct phy_device *phydev)
 	if (phydev->state > PHY_UP && phydev->state != PHY_HALTED)
 		phydev->state = PHY_UP;
 	mutex_unlock(&phydev->lock);
+
+	/* Now we can run the state machine synchronously */
+	phy_state_machine(&phydev->state_queue.work);
 }
 EXPORT_SYMBOL_GPL(phy_stop_machine);
 
@@ -1077,9 +1080,14 @@ void phy_state_machine(struct work_struct *work)
 
 	/* Only re-schedule a PHY state machine change if we are polling the
 	 * PHY, if PHY_IGNORE_INTERRUPT is set, then we will be moving
-	 * between states from phy_mac_interrupt()
+	 * between states from phy_mac_interrupt().
+	 *
+	 * If do_suspend is set to true from PHY_HALTED, in that case, do not
+	 * reschedule the state machine since that would be pointless and
+	 * possibly error prone when called from phy_disconnect()
+	 * synchronously.
 	 */
-	if (phydev->irq == PHY_POLL)
+	if (phydev->irq == PHY_POLL && !do_suspend)
 		queue_delayed_work(system_power_efficient_wq, &phydev->state_queue,
 				   PHY_STATE_TIME * HZ);
 }
