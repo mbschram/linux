@@ -607,6 +607,8 @@ static int dsa_setup_dst(struct dsa_switch_tree *dst, struct net_device *dev,
 	dev->dsa_ptr = dst;
 	dst->applied = true;
 
+	dsa_debugfs_create_tree(dst);
+
 	return 0;
 }
 
@@ -671,6 +673,8 @@ out:
 static void dsa_remove_dst(struct dsa_switch_tree *dst)
 {
 	int i;
+
+	dsa_debugfs_destroy_tree(dst);
 
 	dst->cpu_dp->netdev->dsa_ptr = NULL;
 
