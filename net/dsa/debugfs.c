@@ -10,6 +10,7 @@
  */
 
 #include <linux/debugfs.h>
+#include <linux/etherdevice.h>
 #include <linux/seq_file.h>
 
 #include "dsa_priv.h"
@@ -108,6 +109,36 @@ static int dsa_debugfs_create_file(struct dsa_switch *ds, struct dentry *dir,
 
 	return 0;
 }
+
+static int dsa_debugfs_fdb_dump_cb(const unsigned char *addr, u16 vid,
+				   bool is_static, void *data)
+{
+	struct seq_file *seq = data;
+	int i;
+
+	seq_printf(seq, "vid %d", vid);
+	for (i = 0; i < ETH_ALEN; i++)
+		seq_printf(seq, "%s%02x", i ? ":" : "    ", addr[i]);
+	seq_printf(seq, "    %s", is_static ? "static" : "dynamic");
+	seq_printf(seq, "    %s", is_unicast_ether_addr(addr) ?
+		   "unicast" : "multicast");
+	seq_puts(seq, "\n");
+
+	return 0;
+}
+
+static int dsa_debugfs_fdb_read(struct dsa_switch *ds, int id,
+				struct seq_file *seq)
+{
+	if (!ds->ops->port_fdb_dump)
+		return -EOPNOTSUPP;
+
+	return ds->ops->port_fdb_dump(ds, id, dsa_debugfs_fdb_dump_cb, seq);
+}
+
+static const struct dsa_debugfs_ops dsa_debugfs_fdb_ops = {
+	.read = dsa_debugfs_fdb_read,
+};
 
 static void dsa_debugfs_regs_read_count(struct dsa_switch *ds, int id,
 					struct seq_file *seq, int count)
@@ -252,6 +283,11 @@ static int dsa_debugfs_create_port(struct dsa_switch *ds, int port)
 	dir = debugfs_create_dir(name, ds->debugfs_dir);
 	if (IS_ERR_OR_NULL(dir))
 		return -EFAULT;
+
+	err = dsa_debugfs_create_file(ds, dir, "fdb", port,
+				      &dsa_debugfs_fdb_ops);
+	if (err)
+		return err;
 
 	err = dsa_debugfs_create_file(ds, dir, "regs", port,
 				      &dsa_debugfs_regs_ops);
