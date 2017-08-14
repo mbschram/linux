@@ -109,6 +109,55 @@ static int dsa_debugfs_create_file(struct dsa_switch *ds, struct dentry *dir,
 	return 0;
 }
 
+static int dsa_debugfs_tag_protocol_read(struct dsa_switch *ds, int id,
+					 struct seq_file *seq)
+{
+	enum dsa_tag_protocol proto;
+
+	if (!ds->ops->get_tag_protocol)
+		return -EOPNOTSUPP;
+
+	proto = ds->ops->get_tag_protocol(ds);
+
+	switch (proto) {
+	case DSA_TAG_PROTO_NONE:
+		seq_puts(seq, "NONE\n");
+		break;
+	case DSA_TAG_PROTO_BRCM:
+		seq_puts(seq, "BRCM\n");
+		break;
+	case DSA_TAG_PROTO_DSA:
+		seq_puts(seq, "DSA\n");
+		break;
+	case DSA_TAG_PROTO_EDSA:
+		seq_puts(seq, "EDSA\n");
+		break;
+	case DSA_TAG_PROTO_KSZ:
+		seq_puts(seq, "KSZ\n");
+		break;
+	case DSA_TAG_PROTO_LAN9303:
+		seq_puts(seq, "LAN9303\n");
+		break;
+	case DSA_TAG_PROTO_MTK:
+		seq_puts(seq, "MTK\n");
+		break;
+	case DSA_TAG_PROTO_QCA:
+		seq_puts(seq, "QCA\n");
+		break;
+	case DSA_TAG_PROTO_TRAILER:
+		seq_puts(seq, "TRAILER\n");
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static const struct dsa_debugfs_ops dsa_debugfs_tag_protocol_ops = {
+	.read = dsa_debugfs_tag_protocol_read,
+};
+
 static int dsa_debugfs_tree_read(struct dsa_switch *ds, int id,
 				 struct seq_file *seq)
 {
@@ -150,6 +199,11 @@ static int dsa_debugfs_create_switch(struct dsa_switch *ds)
 	ds->debugfs_dir = debugfs_create_dir(name, dsa_debugfs_dir);
 	if (IS_ERR_OR_NULL(ds->debugfs_dir))
 		return -EFAULT;
+
+	err = dsa_debugfs_create_file(ds, ds->debugfs_dir, "tag_protocol", -1,
+				      &dsa_debugfs_tag_protocol_ops);
+	if (err)
+		return err;
 
 	err = dsa_debugfs_create_file(ds, ds->debugfs_dir, "tree", -1,
 				      &dsa_debugfs_tree_ops);
