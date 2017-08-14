@@ -605,6 +605,7 @@ static int dsa_setup_dst(struct dsa_switch_tree *dst, struct net_device *dev,
 	 */
 	wmb();
 	dev->dsa_ptr = dst;
+	dst->applied = true;
 
 	return 0;
 }
@@ -689,6 +690,8 @@ static void dsa_remove_dst(struct dsa_switch_tree *dst)
 	dsa_cpu_port_ethtool_restore(dst->cpu_dp);
 
 	dev_put(dst->cpu_dp->netdev);
+
+	dst->applied = false;
 }
 
 static int dsa_remove(struct platform_device *pdev)
