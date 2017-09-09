@@ -53,6 +53,9 @@
 /* EEE Control Registers Page */
 #define B53_EEE_PAGE			0x92
 
+/* CFP TCAM Registers Page */
+#define B53_CFP_TCAM_PAGE		0xa0
+
 /* CFP Configuration Registers Page */
 #define B53_CFP_PAGE			0xa1
 
@@ -511,6 +514,117 @@
 /* EEE Wake timer FE register (16 bit) */
 #define B53_EEE_WAKE_TIMER_FE(i)	(0xb2 + 2 * (i))
 
+/*************************************************************************
+ * CFP TCAM Page Registers
+ *************************************************************************/
+
+/* CFP TCAM Access Register (32 bit) */
+#define B53_CFP_TCAM_ACC		0x00
+#define  TCAM_OP_STR_DONE		BIT(0)
+#define  TCAM_OP_SEL_SHIFT		1
+#define  TCAM_OP_SEL_READ		(1 << TCAM_OP_SEL_SHIFT)
+#define  TCAM_OP_SEL_WRITE		(2 << TCAM_OP_SEL_SHIFT)
+#define  TCAM_OP_SEL_SEARCH		(4 << TCAM_OP_SEL_SHIFT)
+#define  TCAM_OP_SEL_MASK		(7 << TCAM_OP_SEL_SHIFT)
+#define  TCAM_RAM_CLEAR			BIT(4)
+#define  TCAM_RAM_SEL_SHIFT		10
+#define  TCAM_RAM_SEL			(1 << TCAM_RAM_SEL_SHIFT)
+#define  TCAM_ACT_POL_RAM		(2 << TCAM_RAM_SEL_SHIFT)
+#define  TCAM_RATE_METER_RAM		(4 << TCAM_RAM_SEL_SHIFT)
+#define  TCAM_INB_STAT_RAM		(8 << TCAM_RAM_SEL_SHIFT)
+#define  TCAM_OUTB_STAT_RAM		(16 << TCAM_RAM_SEL_SHIFT)
+#define  TCAM_RAM_SEL_MASK		(0x1f << TCAM_RAM_SEL_SHIFT)
+#define  TCAM_RAM_RESET			BIT(15)
+#define  TCAM_XCESS_ADDR_SHIFT		16
+#define  TCAM_XCESS_ADDR_MASK		0xff
+#define  TCAM_SEARCH_STS		BIT(27)
+#define  TCAM_RD_STS_SHIFT		28
+#define  TCAM_RD_STS_TCAM		(1 << TCAM_RD_STS_SHIFT)
+#define  TCAM_RD_STS_ACT_POL_RAM	(2 << TCAM_RD_STS_SHIFT)
+#define  TCAM_RD_STS_RATE_METER_RAM	(4 << TCAM_RD_STS_SHIFT)
+#define  TCAM_RD_STS_STAT_RAM		(8 << TCAM_RD_STS_SHIFT)
+
+/* CFP TCAM Data Registers (32 bit) */
+#define B53_CFP_TCAM_DATA(i)		(0x10 + (i) * 4)
+
+/* CFP TCAM Mask Registers (32 bit) */
+#define B53_CFP_TCAM_MASK(i)		(0x30 + (i) * 4)
+
+/* CFP TCAM Action/Policy Data 0 Register (32 bit) */
+
+/* Definitions for 51x25 switches */
+#define B53_CFP_ACT_POL_DATA0		0x50
+#define  DATA0_DST_MAP_IB_MASK		0x3f	/* bit 6 = IMP */
+#define  DATA0_CHG_FWD_IB_SHIFT		7
+#define  DATA0_CHG_FWD_IB_NO_CHG	(0 << DATA0_CHG_FWD_IB_SHIFT)
+#define  DATA0_CHG_FWD_REDIR		(2 << DATA0_CHG_FWD_IB_SHIFT)
+#define  DATA0_CHG_FWD_COPY		(3 << DATA0_CHG_FWD_IB_SHIFT)
+#define  DATA0_NEW_TOS_DSCP_IB_SHIFT	9
+#define  DATA0_NEW_TOS_DSCP_IB_MASK	0x3f
+#define  DATA0_CHANGE_TOS_DSCP_IB	BIT(15)
+#define  DATA0_DST_MAP_OB_MASK		0x3f
+#define  DATA0_DST_MAP_OB_SHIFT		16	/* bit 22 = IMP */
+#define  DATA0_CHG_FWD_OB_SHIFT		23
+#define  DATA0_CHG_FWD_OB_REDIR		(2 << DATA0_CHG_FWD_OB_SHIFT)
+#define  DATA0_CHG_FWD_OB_COPY		(3 << DATA0_CHG_FWD_OB_SHIFT)
+#define  DATA0_NEW_DSCP_OB_SHIFT	25
+#define  DATA0_NEW_DSCP_OB_MASK		0x3f
+#define  DATA0_CHANGE_TOS_DSCP_OB	BIT(31)
+
+/* Definitions for 5395 switches */
+#define  DATA0_NEW_DST_PTR_IB_MASK_95	0x1f	/* bit 5 = IMP */
+#define  DATA0_COPY_REDIR_DST_PTR_IB_95	BIT(6)
+#define  DATA0_CHANGE_FWD_MAP_IB_95	BIT(7)
+#define  DATA0_NEW_TC_IB_SHIFT_95	8
+#define  DATA0_NEW_TC_IB_MASK_95	0x7
+#define  DATA0_CHANGE_TC_IB_95		BIT(11)
+#define  DATA0_NEW_TOS_DSCP_IB_SHIFT_95	12
+#define  DATA0_NEW_TOS_DSCP_IB_MASK_95	0x3f
+#define  DATA0_CHANGE_TOS_DSCP_IB_95	BIT(18)
+
+/* CFP TCAM Action/Policy Data 1 Register (32 bit) */
+#define B53_CFP_ACT_POL_DATA1		0x54
+
+/* Definitions for 531x5 switches */
+#define  DATA1_VLAN_BYPASS		BIT(0)
+#define  DATA1_EAP_BYPASS		BIT(1)
+#define  DATA1_STP_BYPASS		BIT(2)
+#define  DATA1_REASON_CODE_SHIFT	3
+#define  DATA1_RESAON_CODE_MASK		0x3f
+#define  DATA1_LOOP_ENABLE		BIT(9)
+#define  DATA1_NEW_TC_SHIFT		10
+#define  DATA1_NEW_TC_MASK		0x7
+#define  DATA1_CHANGE_TC		BIT(13)
+#define  DATA1_CHAIN_ID_SHIFT		14
+#define  DATA1_CHAIN_ID_MASK		0xfff
+
+/* 5395 also has a different register layout here */
+#define  DATA1_NEW_DST_PTR_OB_MASK_95	0x3f
+#define  DATA1_COPY_REDIR_DST_PTR_OB_95	BIT(6)
+#define  DATA1_CHANGE_FWD_MAP_OB_95	BIT(7)
+#define  DATA1_NEW_TC_OB_SHIFT_95	8
+#define  DATA1_NEW_TC_OB_MASK_95	0x7
+#define  DATA1_CHANGE_TC_OB_95		BIT(11)
+#define  DATA1_NEW_TOS_DSCP_OB_SHIFT_95	12
+#define  DATA1_NEW_TOS_DSCP_OB_MASK_95	0x3f
+#define  DATA1_CHANGE_TOS_DSCP_OB_95	BIT(18)
+
+/* CFP Rate Meter Data 0 Register (32 bit) */
+#define B53_CFP_RATE_METER0		0x60
+#define  METER0_CURR_QUOTA_MASK		0xffffff
+
+/* CFP Rate Meter Data 1 Register (32 bit) */
+#define B53_CFP_RATE_METER1		0x64
+#define  METER1_TOKEN_NUM_MASK		0xff
+#define  METER1_REFRESH_CAP_SHIFT	8
+#define  METER1_REFRESH_CAP_MASK	0xf
+#define  METER1_RATE_REFRESH_EN		BIT(31)
+
+/* CFP Rate In-Band Statistics Data Register (32 bit) */
+#define B53_CFP_RATE_IB_DATA		0x70
+
+/* CFP Rate Out-Band Statistics Data Register (32 bit) */
+#define B53_CFP_RATE_OB_DATA		0x74
 
 /*************************************************************************
  * CFP Configuration Page Registers
