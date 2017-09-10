@@ -784,6 +784,8 @@ static int bcm_sf2_sw_setup(struct dsa_switch *ds)
 			bcm_sf2_imp_setup(ds, port);
 	}
 
+	b53_enable_bpdu(ds);
+
 	bcm_sf2_sw_configure_vlan(ds);
 
 	return 0;
