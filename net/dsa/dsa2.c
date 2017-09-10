@@ -512,6 +512,7 @@ static int dsa_cpu_parse(struct dsa_port *port, u32 index,
 
 	/* Make a few copies for faster access in master receive hot path */
 	dst->cpu_dp->rcv = dst->cpu_dp->tag_ops->rcv;
+	dst->cpu_dp->tag_protocol = tag_protocol;
 	dst->cpu_dp->dst = dst;
 
 	return 0;

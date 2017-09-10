@@ -175,6 +175,9 @@ struct dsa_port {
 		DSA_PORT_TYPE_USER,
 	} type;
 
+	/* Tagging protocol number */
+	enum dsa_tag_protocol tag_protocol;
+
 	struct dsa_switch	*ds;
 	unsigned int		index;
 	const char		*name;

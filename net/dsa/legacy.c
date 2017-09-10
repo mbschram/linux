@@ -159,6 +159,7 @@ static int dsa_switch_setup_one(struct dsa_switch *ds,
 
 		/* Few copies for faster access in master receive hot path */
 		dst->cpu_dp->rcv = dst->cpu_dp->tag_ops->rcv;
+		dst->cpu_dp->tag_protocol = tag_protocol;
 		dst->cpu_dp->dst = dst;
 	}
 
