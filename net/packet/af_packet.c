@@ -66,6 +66,7 @@
 #include <linux/kmod.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
+#include <net/dsa.h>
 #include <net/net_namespace.h>
 #include <net/ip.h>
 #include <net/protocol.h>
@@ -1002,11 +1003,24 @@ static void prb_fill_vlan_info(struct tpacket_kbdq_core *pkc,
 	}
 }
 
+static void prb_fill_dsa_info(struct tpacket_kbdq_core *pkc,
+			struct tpacket3_hdr *ppd)
+{
+	struct dsa_switch_tree __maybe_unused *dst;
+
+	if (netdev_uses_dsa(pkc->skb->dev)) {
+		dst = pkc->skb->dev->dsa_ptr;
+		ppd->hv1.tp_padding = dst->tag_protocol;
+		ppd->tp_status |= TP_STATUS_DSA_TAG_VALID;
+	}
+}
+
 static void prb_run_all_ft_ops(struct tpacket_kbdq_core *pkc,
 			struct tpacket3_hdr *ppd)
 {
 	ppd->hv1.tp_padding = 0;
 	prb_fill_vlan_info(pkc, ppd);
+	prb_fill_dsa_info(pkc, ppd);
 
 	if (pkc->feature_req_word & TP_FT_REQ_FILL_RXHASH)
 		prb_fill_rxhash(pkc, ppd);
