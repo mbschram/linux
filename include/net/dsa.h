@@ -19,25 +19,13 @@
 #include <linux/workqueue.h>
 #include <linux/of.h>
 #include <linux/ethtool.h>
+#include <uapi/linux/if_dsa.h>
 #include <net/devlink.h>
 #include <net/switchdev.h>
 
 struct tc_action;
 struct phy_device;
 struct fixed_phy_status;
-
-enum dsa_tag_protocol {
-	DSA_TAG_PROTO_NONE = 0,
-	DSA_TAG_PROTO_BRCM,
-	DSA_TAG_PROTO_DSA,
-	DSA_TAG_PROTO_EDSA,
-	DSA_TAG_PROTO_KSZ,
-	DSA_TAG_PROTO_LAN9303,
-	DSA_TAG_PROTO_MTK,
-	DSA_TAG_PROTO_QCA,
-	DSA_TAG_PROTO_TRAILER,
-	DSA_TAG_LAST,		/* MUST BE LAST */
-};
 
 #define DSA_MAX_SWITCHES	4
 #define DSA_MAX_PORTS		12
