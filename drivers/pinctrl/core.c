@@ -1197,9 +1197,21 @@ int pinctrl_select_state(struct pinctrl *p, struct pinctrl_state *state)
 {
 	struct pinctrl_setting *setting, *setting2;
 	struct pinctrl_state *old_state = p->state;
+	bool force = false;
 	int ret;
 
-	if (p->state == state)
+	if (p->state) {
+		list_for_each_entry(setting, &p->state->settings, node) {
+			if (setting->pctldev->flags & PINCTRL_FLG_FORCE_STATE)
+				force = true;
+		}
+	}
+
+	/* Some controllers may want to force this operation when they define
+	 * only one set of functions and lose power state, e.g: pinctrl-single
+	 * with its pinctrl-single,low-power-state-loss property.
+	 */
+	if (p->state == state && !force)
 		return 0;
 
 	if (p->state) {

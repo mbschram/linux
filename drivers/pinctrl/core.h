@@ -39,6 +39,7 @@ struct pinctrl_gpio_range;
  * @hog_sleep: sleep state for pins hogged by this device
  * @mutex: mutex taken on each pin controller specific action
  * @device_root: debugfs root for this device
+ * @flags: feature/quirk flags
  */
 struct pinctrl_dev {
 	struct list_head node;
@@ -63,7 +64,10 @@ struct pinctrl_dev {
 #ifdef CONFIG_DEBUG_FS
 	struct dentry *device_root;
 #endif
+	unsigned long flags;
 };
+
+#define PINCTRL_FLG_FORCE_STATE	(1 << 0)
 
 /**
  * struct pinctrl - per-device pin control state holder
