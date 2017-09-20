@@ -1749,6 +1749,9 @@ static int pcs_probe(struct platform_device *pdev)
 		goto free;
 	}
 
+	if (of_property_read_bool(np, "pinctrl-single,low-power-state-loss"))
+		pcs->pctl->flags |= PINCTRL_FLG_FORCE_STATE;
+
 	ret = pcs_add_gpio_func(np, pcs);
 	if (ret < 0)
 		goto free;

@@ -82,6 +82,10 @@ Optional properties:
 		/* pin base, nr pins & gpio function */
 		pinctrl-single,gpio-range = <&range 0 3 0 &range 3 9 1>;
 
+- pinctrl-single,low-power-state-loss : indicates that the pins lose their
+  state during low power modes and therefore need to be restored upon
+  system resumption.
+
 - interrupt-controller : standard interrupt controller binding if using
   interrupts for wake-up events for example. In this case pinctrl-single
   is set up as a chained interrupt controller and the wake-up interrupts
