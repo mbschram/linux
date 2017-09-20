@@ -16,7 +16,7 @@
 
 	/* Hurricane 2 designs use the second UART */
 	chosen {
-		bootargs = "console=ttyS1,115200";
+		bootargs = "console=ttyS1,115200 earlyprintk";
 	};
 
 	memory {
@@ -26,5 +26,13 @@
 };
 
 &uart1 {
+	status = "okay";
+};
+
+&pcie0 {
+	status = "okay";
+};
+
+&pcie1 {
 	status = "okay";
 };
