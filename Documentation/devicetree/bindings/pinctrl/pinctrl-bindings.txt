@@ -103,6 +103,10 @@ Optional properties:
 #pinctrl-cells:	Number of pin control cells in addition to the index within the
 		pin controller device instance
 
+low-power-state-loss: boolean property which indicates that the pins lose their
+state during low power modes and therefore need to be restored upon system
+resumption.
+
 Pin controller devices should contain the pin configuration nodes that client
 devices reference.
 

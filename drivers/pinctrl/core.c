@@ -1978,6 +1978,9 @@ pinctrl_init_controller(struct pinctrl_desc *pctldesc, struct device *dev,
 	pctldev->dev = dev;
 	mutex_init(&pctldev->mutex);
 
+	if (of_property_read_bool(dev->of_node, "low-power-state-loss"))
+		pctldev->flags |= PINCTRL_FLG_FORCE_STATE;
+
 	/* check core ops for sanity */
 	ret = pinctrl_check_ops(pctldev);
 	if (ret) {
