@@ -220,6 +220,12 @@ config AT803X_PHY
 	---help---
 	  Currently supports the AT8030 and AT8035 model
 
+config BCM531XX_PHY
+	tristate "Drivers for Broadcom BCM531XX switches"
+	---help---
+	  Currently supports the Broadcom BCM53101 and BCM53125 external
+	  switches.
+
 config BCM63XX_PHY
 	tristate "Broadcom 63xx SOCs internal PHY"
 	depends on BCM63XX
