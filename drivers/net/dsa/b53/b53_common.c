@@ -330,10 +330,11 @@ static void b53_set_forwarding(struct b53_device *dev, int enable)
 
 	b53_read8(dev, B53_CTRL_PAGE, B53_SWITCH_MODE, &mgmt);
 
+	/* Managed mode only alters reserved multicast frames forwarding */
 	if (enable)
-		mgmt |= SM_SW_FWD_EN;
+		mgmt |= SM_SW_FWD_EN | SM_SW_FWD_MODE;
 	else
-		mgmt &= ~SM_SW_FWD_EN;
+		mgmt &= ~(SM_SW_FWD_EN | SM_SW_FWD_MODE);
 
 	b53_write8(dev, B53_CTRL_PAGE, B53_SWITCH_MODE, mgmt);
 
