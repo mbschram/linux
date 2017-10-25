@@ -2601,6 +2601,11 @@ static int smsc911x_suspend(struct device *dev)
 	if (netif_running(ndev)) {
 		netif_stop_queue(ndev);
 		netif_device_detach(ndev);
+		phy_stop(ndev->phydev);
+		/* Use a hard synchronization here because we will cut the
+		 * power fo the block next
+		 */
+		phy_stop_machine(ndev->phydev);
 	}
 
 	/* enable wake on LAN, energy detection and the external PME
@@ -2641,6 +2646,8 @@ static int smsc911x_resume(struct device *dev)
 
 	if (netif_running(ndev)) {
 		netif_device_attach(ndev);
+		phy_start_machine(ndev->phydev);
+		phy_start(ndev->phydev);
 		netif_start_queue(ndev);
 	}
 
