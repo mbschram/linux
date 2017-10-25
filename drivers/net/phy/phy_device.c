@@ -797,6 +797,11 @@ void phy_disconnect(struct phy_device *phydev)
 	if (phydev->irq > 0)
 		phy_stop_interrupts(phydev);
 
+	mutex_lock(&phydev->lock);
+	WARN_ON(phydev->state != PHY_HALTED);
+	phydev->state = PHY_HALTED;
+	mutex_unlock(&phydev->lock);
+
 	phy_stop_machine(phydev);
 
 	phydev->adjust_link = NULL;
