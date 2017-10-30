@@ -1136,6 +1136,9 @@ static void smsc911x_tx_update_txcounters(struct net_device *dev)
 	struct smsc911x_data *pdata = netdev_priv(dev);
 	unsigned int tx_stat;
 
+	if (!netif_running(dev))
+		return;
+
 	while ((tx_stat = smsc911x_tx_get_txstatus(pdata)) != 0) {
 		if (unlikely(tx_stat & 0x80000000)) {
 			/* In this driver the packet tag is used as the packet
