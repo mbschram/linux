@@ -25,6 +25,7 @@
 struct tc_action;
 struct phy_device;
 struct fixed_phy_status;
+struct phylink_link_state;
 
 enum dsa_tag_protocol {
 	DSA_TAG_PROTO_NONE = 0,
@@ -342,6 +343,24 @@ struct dsa_switch_ops {
 				struct phy_device *phydev);
 	void	(*fixed_link_update)(struct dsa_switch *ds, int port,
 				struct fixed_phy_status *st);
+
+	/*
+	 * PHYKINK integration
+	 */
+	void	(*phylink_validate)(struct dsa_switch *ds, int port,
+				    unsigned long *supported,
+				    struct phylink_link_state *state);
+	int	(*phylink_mac_link_state)(struct dsa_switch *ds, int port,
+					  struct phylink_link_state *state);
+	void	(*phylink_mac_config)(struct dsa_switch *ds, int port,
+				      unsigned int mode,
+				      const struct phylink_link_state *state);
+	void	(*phylink_mac_an_restart)(struct dsa_switch *ds, int port);
+	void	(*phylink_mac_link_down)(struct dsa_switch *ds, int port,
+					 unsigned int mode);
+	void	(*phylink_mac_link_up)(struct dsa_switch *ds, int port,
+				       unsigned int mode,
+				       struct phy_device *phydev);
 
 	/*
 	 * ethtool hardware statistics.
