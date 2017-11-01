@@ -12,6 +12,7 @@
 #define __DSA_PRIV_H
 
 #include <linux/phy.h>
+#include <linux/phylink.h>
 #include <linux/netdevice.h>
 #include <linux/netpoll.h>
 #include <net/dsa.h>
@@ -83,6 +84,9 @@ struct dsa_slave_priv {
 	int			old_link;
 	int			old_pause;
 	int			old_duplex;
+
+	/* PHYLINK members */
+	struct phylink		*pl;
 
 #ifdef CONFIG_NET_POLL_CONTROLLER
 	struct netpoll		*netpoll;
