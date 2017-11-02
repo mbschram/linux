@@ -131,6 +131,7 @@ static const struct of_device_id bcm2835_rng_of_match[] = {
 	{ .compatible = "brcm,bcm2835-rng"},
 	{ .compatible = "brcm,bcm-nsp-rng", .data = &nsp_rng_of_data },
 	{ .compatible = "brcm,bcm5301x-rng", .data = &nsp_rng_of_data },
+	{ .compatible = "brcm,bcm6368-rng"},
 	{},
 };
 
@@ -164,7 +165,7 @@ static int bcm2835_rng_probe(struct platform_device *pdev)
 	if (IS_ERR(priv->clk))
 		priv->clk = NULL;
 
-	priv->rng.name = "bcm2835-rng";
+	priv->rng.name = pdev->id_entry->name;
 	priv->rng.init = bcm2835_rng_init;
 	priv->rng.read = bcm2835_rng_read;
 	priv->rng.cleanup = bcm2835_rng_cleanup;
@@ -190,12 +191,20 @@ static int bcm2835_rng_probe(struct platform_device *pdev)
 
 MODULE_DEVICE_TABLE(of, bcm2835_rng_of_match);
 
+static struct platform_device_id bcm2835_rng_devtype[] = {
+	{ .name = "bcm2835-rng" },
+	{ .name = "bcm63xx-rng" },
+	{ /* sentinel */ }
+};
+MODULE_DEVICE_TABLE(platform, bcm2835_rng_devtype);
+
 static struct platform_driver bcm2835_rng_driver = {
 	.driver = {
 		.name = "bcm2835-rng",
 		.of_match_table = bcm2835_rng_of_match,
 	},
 	.probe		= bcm2835_rng_probe,
+	.id_table	= bcm2835_rng_devtype,
 };
 module_platform_driver(bcm2835_rng_driver);
 
