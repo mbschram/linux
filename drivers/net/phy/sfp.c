@@ -463,8 +463,9 @@ static int sfp_sm_mod_probe(struct sfp *sfp)
 		 vendor, part, rev, sn, date);
 
 	/* We only support SFP modules, not the legacy GBIC modules. */
-	if (sfp->id.base.phys_id != SFP_PHYS_ID_SFP ||
-	    sfp->id.base.phys_ext_id != SFP_PHYS_EXT_ID_SFP) {
+	if ((sfp->id.base.phys_id != SFP_PHYS_ID_SFP &&
+	     sfp->id.base.phys_id != SFP_PHYS_ID_SFF) ||
+	     sfp->id.base.phys_ext_id != SFP_PHYS_EXT_ID_SFP) {
 		dev_err(sfp->dev, "module is not SFP - phys id 0x%02x 0x%02x\n",
 			sfp->id.base.phys_id, sfp->id.base.phys_ext_id);
 		return -EINVAL;
