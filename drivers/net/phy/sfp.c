@@ -488,12 +488,10 @@ static int sfp_sm_mod_probe(struct sfp *sfp)
 	}
 
 	check = sfp_check(&id.ext, sizeof(id.ext) - 1);
-	if (check != id.ext.cc_ext) {
-		dev_err(sfp->dev,
+	if (check != id.ext.cc_ext)
+		dev_warn(sfp->dev,
 			"EEPROM extended structure checksum failure: 0x%02x\n",
 			check);
-		memset(&id.ext, 0, sizeof(id.ext));
-	}
 
 	sfp->id = id;
 
