@@ -185,6 +185,11 @@ static unsigned int sfp_gpio_get_state(struct sfp *sfp)
 	return state;
 }
 
+static unsigned int sff_gpio_get_state(struct sfp *sfp)
+{
+	return sfp_gpio_get_state(sfp) | SFP_F_PRESENT;
+}
+
 static void sfp_gpio_set_state(struct sfp *sfp, unsigned int state)
 {
 	if (state & SFP_F_PRESENT) {
@@ -876,6 +881,10 @@ static int sfp_probe(struct platform_device *pdev)
 
 		sfp->get_state = sfp_gpio_get_state;
 		sfp->set_state = sfp_gpio_set_state;
+
+		/* SFF modules are soldered, and have no MODDEF0 signal */
+		if (of_device_is_compatible(node, "sff,sff"))
+			sfp->get_state = sff_gpio_get_state;
 	}
 
 	sfp->sfp_bus = sfp_register_socket(sfp->dev, sfp, &sfp_module_ops);
@@ -932,6 +941,7 @@ static int sfp_remove(struct platform_device *pdev)
 }
 
 static const struct of_device_id sfp_of_match[] = {
+	{ .compatible = "sff,sff", },
 	{ .compatible = "sff,sfp", },
 	{ },
 };
