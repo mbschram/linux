@@ -23,13 +23,17 @@ enum {
 	GPIO_TX_DISABLE,
 	GPIO_RATE_SELECT,
 	GPIO_MAX,
+};
 
+enum sfp_f_state {
 	SFP_F_PRESENT = BIT(GPIO_MODDEF0),
 	SFP_F_LOS = BIT(GPIO_LOS),
 	SFP_F_TX_FAULT = BIT(GPIO_TX_FAULT),
 	SFP_F_TX_DISABLE = BIT(GPIO_TX_DISABLE),
 	SFP_F_RATE_SELECT = BIT(GPIO_RATE_SELECT),
+};
 
+enum sfp_event_state {
 	SFP_E_INSERT = 0,
 	SFP_E_REMOVE,
 	SFP_E_DEV_DOWN,
@@ -39,15 +43,21 @@ enum {
 	SFP_E_LOS_HIGH,
 	SFP_E_LOS_LOW,
 	SFP_E_TIMEOUT,
+};
 
+enum sfp_mod_state {
 	SFP_MOD_EMPTY = 0,
 	SFP_MOD_PROBE,
 	SFP_MOD_PRESENT,
 	SFP_MOD_ERROR,
+};
 
+enum sfp_dev_state {
 	SFP_DEV_DOWN = 0,
 	SFP_DEV_UP,
+};
 
+enum sfp_sm_state {
 	SFP_S_DOWN = 0,
 	SFP_S_INIT,
 	SFP_S_WAIT_LOS,
@@ -115,9 +125,9 @@ struct sfp {
 	struct delayed_work poll;
 	struct delayed_work timeout;
 	struct mutex sm_mutex;
-	unsigned char sm_mod_state;
-	unsigned char sm_dev_state;
-	unsigned short sm_state;
+	enum sfp_mod_state sm_mod_state;
+	enum sfp_dev_state sm_dev_state;
+	enum sfp_sm_state sm_state;
 	unsigned int sm_retries;
 
 	struct sfp_eeprom_id id;
