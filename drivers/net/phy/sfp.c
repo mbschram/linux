@@ -45,6 +45,18 @@ enum sfp_event_state {
 	SFP_E_TIMEOUT,
 };
 
+static const char *sfp_even_to_str[] = {
+	"insert",
+	"remove",
+	"device down",
+	"device up",
+	"TX fault",
+	"TX clear",
+	"LOS high",
+	"LOS low",
+	"timeout"
+};
+
 enum sfp_mod_state {
 	SFP_MOD_EMPTY = 0,
 	SFP_MOD_PROBE,
@@ -52,9 +64,21 @@ enum sfp_mod_state {
 	SFP_MOD_ERROR,
 };
 
+static const char *sfp_mod_state_to_str[] = {
+	"empty",
+	"probe",
+	"present",
+	"error",
+};
+
 enum sfp_dev_state {
 	SFP_DEV_DOWN = 0,
 	SFP_DEV_UP,
+};
+
+static const char *sfp_dev_state_to_str[] = {
+	"UP",
+	"DOWN",
 };
 
 enum sfp_sm_state {
@@ -65,6 +89,16 @@ enum sfp_sm_state {
 	SFP_S_TX_FAULT,
 	SFP_S_REINIT,
 	SFP_S_TX_DISABLE,
+};
+
+static const char *sfp_state_to_str[] = {
+	"down",
+	"init",
+	"wait LOS",
+	"link UP",
+	"TX fault",
+	"re-initialization",
+	"TX disable",
 };
 
 static const char *gpio_of_names[] = {
@@ -502,8 +536,10 @@ static void sfp_sm_event(struct sfp *sfp, unsigned int event)
 {
 	mutex_lock(&sfp->sm_mutex);
 
-	dev_dbg(sfp->dev, "SM: enter %u:%u:%u event %u\n",
-		sfp->sm_mod_state, sfp->sm_dev_state, sfp->sm_state, event);
+	dev_dbg(sfp->dev, "SM: enter %s:%s:%s event: %s\n",
+		sfp_mod_state_to_str[sfp->sm_mod_state],
+		sfp_dev_state_to_str[sfp->sm_dev_state],
+		sfp_state_to_str[sfp->sm_state], sfp_even_to_str[event]);
 
 	/* This state machine tracks the insert/remove state of
 	 * the module, and handles probing the on-board EEPROM.
@@ -632,8 +668,10 @@ static void sfp_sm_event(struct sfp *sfp, unsigned int event)
 		break;
 	}
 
-	dev_dbg(sfp->dev, "SM: exit %u:%u:%u\n",
-		sfp->sm_mod_state, sfp->sm_dev_state, sfp->sm_state);
+	dev_dbg(sfp->dev, "SM: exit %s:%s:%s\n",
+		sfp_mod_state_to_str[sfp->sm_mod_state],
+		sfp_dev_state_to_str[sfp->sm_dev_state],
+		sfp_state_to_str[sfp->sm_state]);
 
 	mutex_unlock(&sfp->sm_mutex);
 }
