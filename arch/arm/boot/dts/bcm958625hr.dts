@@ -58,6 +58,15 @@
 		open-source;
 		priority = <200>;
 	};
+
+	sfp: sfp {
+		compatible = "sff,sfp";
+		i2c-bus = <&i2c0>;
+		mod-def0-gpios = <&gpioa 28 GPIO_ACTIVE_LOW>;
+		los-gpios = <&gpioa 24 GPIO_ACTIVE_HIGH>;
+		tx-fault-gpios = <&gpioa 30 GPIO_ACTIVE_HIGH>;
+		tx-disable-gpios = <&gpioa 26 GPIO_ACTIVE_HIGH>;
+	};
 };
 
 &amac0 {
@@ -133,6 +142,10 @@
 		function = "nand";
 		groups = "nand_grp";
 	};
+};
+
+&i2c0 {
+	status = "okay";
 };
 
 &qspi {
@@ -211,8 +224,10 @@
 		};
 
 		port@5 {
-			ethernet = <&amac0>;
+			label = "sfp";
+			phy-mode = "sgmii";
 			reg = <5>;
+			sfp = <&sfp>;
 			fixed-link {
 				speed = <1000>;
 				full-duplex;
@@ -220,7 +235,6 @@
 		};
 
 		port@7 {
-			ethernet = <&amac1>;
 			reg = <7>;
 			fixed-link {
 				speed = <1000>;
