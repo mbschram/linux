@@ -539,6 +539,7 @@ static int dsa_port_parse_cpu(struct dsa_port *dp, struct net_device *master)
 	const struct dsa_device_ops *tag_ops;
 	enum dsa_tag_protocol tag_protocol;
 
+	dp->type = DSA_PORT_TYPE_CPU;
 	tag_protocol = ds->ops->get_tag_protocol(ds);
 	tag_ops = dsa_resolve_tag_protocol(tag_protocol);
 	if (IS_ERR(tag_ops)) {
@@ -546,7 +547,6 @@ static int dsa_port_parse_cpu(struct dsa_port *dp, struct net_device *master)
 		return PTR_ERR(tag_ops);
 	}
 
-	dp->type = DSA_PORT_TYPE_CPU;
 	dp->rcv = tag_ops->rcv;
 	dp->tag_ops = tag_ops;
 	dp->master = master;
