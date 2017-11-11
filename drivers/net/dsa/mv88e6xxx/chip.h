@@ -264,6 +264,7 @@ struct mv88e6xxx_ops {
 	 * or LINK_UNFORCED for normal link detection.
 	 */
 	int (*port_set_link)(struct mv88e6xxx_chip *chip, int port, int link);
+	int (*port_get_link)(struct mv88e6xxx_chip *chip, int port, int *link);
 
 #define DUPLEX_UNFORCED		-2
 
@@ -273,6 +274,7 @@ struct mv88e6xxx_ops {
 	 * or DUPLEX_UNFORCED for normal duplex detection.
 	 */
 	int (*port_set_duplex)(struct mv88e6xxx_chip *chip, int port, int dup);
+	int (*port_get_duplex)(struct mv88e6xxx_chip *chip, int port, int *dup);
 
 #define SPEED_MAX		INT_MAX
 #define SPEED_UNFORCED		-2
@@ -283,6 +285,11 @@ struct mv88e6xxx_ops {
 	 * Use SPEED_UNFORCED for normal detection, SPEED_MAX for max value.
 	 */
 	int (*port_set_speed)(struct mv88e6xxx_chip *chip, int port, int speed);
+	int (*port_get_speed)(struct mv88e6xxx_chip *chip, int port, int *speed);
+
+	int (*port_get_an)(struct mv88e6xxx_chip *chip, int port, int *an);
+	int (*port_get_pause)(struct mv88e6xxx_chip *chip, int port, int *rx_pause,
+			      int *tx_pause);
 
 	int (*port_tag_remap)(struct mv88e6xxx_chip *chip, int port);
 

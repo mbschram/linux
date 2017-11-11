@@ -141,6 +141,20 @@ int mv88e6xxx_port_set_link(struct mv88e6xxx_chip *chip, int port, int link)
 	return 0;
 }
 
+int mv88e6xxx_port_get_link(struct mv88e6xxx_chip *chip, int port, int *link)
+{
+	u16 reg;
+	int err;
+
+	err = mv88e6xxx_port_read(chip, port, MV88E6XXX_PORT_STS, &reg);
+	if (err)
+		return err;
+
+	*link = !!(reg & MV88E6XXX_PORT_STS_LINK);
+
+	return err;
+}
+
 int mv88e6xxx_port_set_duplex(struct mv88e6xxx_chip *chip, int port, int dup)
 {
 	u16 reg;
@@ -177,6 +191,23 @@ int mv88e6xxx_port_set_duplex(struct mv88e6xxx_chip *chip, int port, int dup)
 		reg & MV88E6XXX_PORT_MAC_CTL_DUPLEX_FULL ? "full" : "half");
 
 	return 0;
+}
+
+int mv88e6xxx_port_get_duplex(struct mv88e6xxx_chip *chip, int port, int *dup)
+{
+	u16 reg;
+	int err;
+
+	err = mv88e6xxx_port_read(chip, port, MV88E6XXX_PORT_MAC_CTL, &reg);
+	if (err)
+		return err;
+
+	if (reg & MV88E6XXX_PORT_MAC_CTL_DUPLEX_FULL)
+		*dup = DUPLEX_FULL;
+	else
+		*dup = DUPLEX_HALF;
+
+	return err;
 }
 
 static int mv88e6xxx_port_set_speed(struct mv88e6xxx_chip *chip, int port,
@@ -237,6 +268,58 @@ static int mv88e6xxx_port_set_speed(struct mv88e6xxx_chip *chip, int port,
 		dev_dbg(chip->dev, "p%d: Speed set to %d Mbps\n", port, speed);
 	else
 		dev_dbg(chip->dev, "p%d: Speed unforced\n", port);
+
+	return 0;
+}
+
+int mv88e6xxx_port_get_speed(struct mv88e6xxx_chip *chip, int port, int *speed)
+{
+	u16 reg;
+	int err;
+
+	err = mv88e6xxx_port_read(chip, port, MV88E6XXX_PORT_MAC_CTL, &reg);
+	if (err)
+		return err;
+
+	if (reg & MV88E6XXX_PORT_MAC_CTL_SPEED_10)
+		*speed = 10;
+	else if (reg & MV88E6XXX_PORT_MAC_CTL_SPEED_100)
+		*speed = 100;	
+	else if (reg & MV88E6XXX_PORT_MAC_CTL_SPEED_1000)
+		*speed = 1000;
+	else if (reg & (MV88E6390_PORT_MAC_CTL_SPEED_10000 |
+		 MV88E6390_PORT_MAC_CTL_ALTSPEED))
+		*speed = 2500;
+	else if (reg & (MV88E6065_PORT_MAC_CTL_SPEED_200 |
+		        MV88E6XXX_PORT_MAC_CTL_SPEED_100 |
+		        MV88E6390_PORT_MAC_CTL_ALTSPEED))
+		*speed = 200;
+	else
+		*speed = SPEED_UNFORCED;
+
+	return err;
+}
+
+int mv88e6xxx_port_get_pause(struct mv88e6xxx_chip *chip, int port,
+			     int *rx_pause, int *tx_pause)
+{
+	u16 reg;
+	int err;
+
+	err = mv88e6xxx_port_read(chip, port, MV88E6XXX_PORT_STS, &reg);
+	if (err)
+		return err;
+
+	*rx_pause = !!(reg & MV88E6XXX_PORT_STS_PAUSE_EN);
+	*tx_pause = !!(reg & MV88E6XXX_PORT_STS_MY_PAUSE);
+
+	return err;
+}
+
+int mv88e6xxx_port_get_an(struct mv88e6xxx_chip *chip, int port, int *an)
+{
+	/* FIXME */
+	*an = 1;
 
 	return 0;
 }

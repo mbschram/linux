@@ -31,6 +31,7 @@
 #include <linux/netdevice.h>
 #include <linux/gpio/consumer.h>
 #include <linux/phy.h>
+#include <linux/phylink.h>
 #include <net/dsa.h>
 
 #include "chip.h"
@@ -514,6 +515,151 @@ static void mv88e6xxx_adjust_link(struct dsa_switch *ds, int port,
 
 	if (err && err != -EOPNOTSUPP)
 		dev_err(ds->dev, "p%d: failed to configure MAC\n", port);
+}
+
+static void mv88e6xxx_phylink_validate(struct dsa_switch *ds, int port,
+				       unsigned long *supported,
+				       struct phylink_link_state *state)
+{
+	__ETHTOOL_DECLARE_LINK_MODE_MASK(mask) = { };
+
+	phylink_set(mask, Autoneg);
+	phylink_set_port_modes(mask);
+	phylink_set(mask, 1000baseT_Full);
+	phylink_set(mask, 1000baseX_Full);
+
+	if (state->interface != PHY_INTERFACE_MODE_1000BASEX) {
+		/* 10M and 100M are only supported in non-802.3z mode */
+		phylink_set(mask, 10baseT_Half);
+		phylink_set(mask, 10baseT_Full);
+		phylink_set(mask, 100baseT_Half);
+		phylink_set(mask, 100baseT_Full);
+	}
+
+	bitmap_and(supported, supported, mask,
+		   __ETHTOOL_LINK_MODE_MASK_NBITS);
+	bitmap_and(state->advertising, state->advertising, mask,
+		   __ETHTOOL_LINK_MODE_MASK_NBITS);
+}
+
+static int mv88e6xxx_phylink_mac_link_state(struct dsa_switch *ds, int port,
+					    struct phylink_link_state *state)
+{
+	struct mv88e6xxx_chip *chip = ds->priv;
+	int err, link, rx_pause, tx_pause, an;
+
+	if (!chip->info->ops->port_get_link ||
+	    !chip->info->ops->port_get_duplex ||
+	    !chip->info->ops->port_get_speed ||
+	    !chip->info->ops->port_get_pause ||
+	    !chip->info->ops->port_get_an) {
+		dev_dbg(ds->dev, "missing port operations\n");
+		return 0;
+	}
+
+	mutex_lock(&chip->reg_lock);
+	err = chip->info->ops->port_get_link(chip, port, &link);
+	if (err)
+		goto out;
+
+	state->link = !!link;
+
+	err = chip->info->ops->port_get_duplex(chip, port, &state->duplex);
+	if (err)
+		goto out;
+
+	err = chip->info->ops->port_get_speed(chip, port, &state->speed);
+	if (err)
+		goto out;
+
+	err = chip->info->ops->port_get_an(chip, port, &an);
+	if (err)
+		goto out;
+
+	state->an_complete = !!an;
+
+	err = chip->info->ops->port_get_pause(chip, port, &rx_pause, &tx_pause);
+	if (err)
+		goto out;
+
+	if (rx_pause)
+		state->pause |= MLO_PAUSE_RX;
+	if (tx_pause)
+		state->pause |= MLO_PAUSE_TX;
+
+	err = 1;
+out:
+	mutex_unlock(&chip->reg_lock);
+	return err;
+}
+
+static void mv88e6xxx_phylink_mac_config(struct dsa_switch *ds, int port,
+					 unsigned int mode,
+					 const struct phylink_link_state *state)
+{
+	struct mv88e6xxx_chip *chip = ds->priv;
+	int link = -1, speed = -1;
+	int err;
+
+	/* Fixed PHY mode */
+	if (!phylink_autoneg_inband(mode)) {
+		link = 1;
+		speed = state->speed;
+	} else if (state->interface == PHY_INTERFACE_MODE_SGMII) {
+		link = state->link;
+		speed = state->speed;
+	} else {
+		/* 802.3z */
+		link = state->link;
+		speed = SPEED_1000;
+	}
+
+	mutex_lock(&chip->reg_lock);
+	err = mv88e6xxx_port_setup_mac(chip, port, link, speed, state->duplex,
+				       state->interface);
+	mutex_unlock(&chip->reg_lock);
+
+	if (err)
+		dev_err(ds->dev, "Failed to setup port %d MAC: %d\n", port, err);
+}
+
+static void mv88e6xxx_phylink_mac_an_restart(struct dsa_switch *ds, int port)
+{
+}
+
+static void mv88e6xxx_phylink_mac_link_down(struct dsa_switch *ds, int port,
+					    unsigned int mode)
+{
+	struct mv88e6xxx_chip *chip = ds->priv;
+	int err;
+
+	if (!chip->info->ops->port_set_link)
+		return;
+
+	mutex_lock(&chip->reg_lock);
+	/* Port's MAC control must not be changed unless the link is down */
+	err = chip->info->ops->port_set_link(chip, port, 0);
+	mutex_unlock(&chip->reg_lock);
+
+	if (err)
+		dev_err(ds->dev, "Failed to set port %d down\n", port);
+}
+
+static void mv88e6xxx_phylink_mac_link_up(struct dsa_switch *ds, int port,
+					  unsigned int mode,
+					  struct phy_device *phydev)
+{
+	struct mv88e6xxx_chip *chip = ds->priv;
+	int err;
+
+	if (!chip->info->ops->port_set_link)
+		return;
+
+	mutex_lock(&chip->reg_lock);
+	err = chip->info->ops->port_set_link(chip, port, 1);
+	mutex_unlock(&chip->reg_lock);
+	if (err)
+		dev_err(ds->dev, "Failed to set port %d up\n", port);
 }
 
 static int mv88e6xxx_stats_snapshot(struct mv88e6xxx_chip *chip, int port)
@@ -2276,8 +2422,13 @@ static const struct mv88e6xxx_ops mv88e6085_ops = {
 	.phy_read = mv88e6185_phy_ppu_read,
 	.phy_write = mv88e6185_phy_ppu_write,
 	.port_set_link = mv88e6xxx_port_set_link,
+	.port_get_link = mv88e6xxx_port_get_link,
 	.port_set_duplex = mv88e6xxx_port_set_duplex,
+	.port_get_duplex = mv88e6xxx_port_get_duplex,
 	.port_set_speed = mv88e6185_port_set_speed,
+	.port_get_speed = mv88e6xxx_port_get_speed,
+	.port_get_pause = mv88e6xxx_port_get_pause,
+	.port_get_an = mv88e6xxx_port_get_an,
 	.port_tag_remap = mv88e6095_port_tag_remap,
 	.port_set_frame_mode = mv88e6351_port_set_frame_mode,
 	.port_set_egress_floods = mv88e6352_port_set_egress_floods,
@@ -2663,8 +2814,13 @@ static const struct mv88e6xxx_ops mv88e6185_ops = {
 	.phy_read = mv88e6185_phy_ppu_read,
 	.phy_write = mv88e6185_phy_ppu_write,
 	.port_set_link = mv88e6xxx_port_set_link,
+	.port_get_link = mv88e6xxx_port_get_link,
 	.port_set_duplex = mv88e6xxx_port_set_duplex,
+	.port_get_duplex = mv88e6xxx_port_get_duplex,
 	.port_set_speed = mv88e6185_port_set_speed,
+	.port_get_speed = mv88e6xxx_port_get_speed,
+	.port_get_pause = mv88e6xxx_port_get_pause,
+	.port_get_an = mv88e6xxx_port_get_an,
 	.port_set_frame_mode = mv88e6085_port_set_frame_mode,
 	.port_set_egress_floods = mv88e6185_port_set_egress_floods,
 	.port_egress_rate_limiting = mv88e6095_port_egress_rate_limiting,
@@ -3042,9 +3198,14 @@ static const struct mv88e6xxx_ops mv88e6352_ops = {
 	.phy_read = mv88e6xxx_g2_smi_phy_read,
 	.phy_write = mv88e6xxx_g2_smi_phy_write,
 	.port_set_link = mv88e6xxx_port_set_link,
+	.port_get_link = mv88e6xxx_port_get_link,
 	.port_set_duplex = mv88e6xxx_port_set_duplex,
+	.port_get_duplex = mv88e6xxx_port_get_duplex,
 	.port_set_rgmii_delay = mv88e6352_port_set_rgmii_delay,
 	.port_set_speed = mv88e6352_port_set_speed,
+	.port_get_speed = mv88e6xxx_port_get_speed,
+	.port_get_an = mv88e6xxx_port_get_an,
+	.port_get_pause = mv88e6xxx_port_get_pause,
 	.port_tag_remap = mv88e6095_port_tag_remap,
 	.port_set_frame_mode = mv88e6351_port_set_frame_mode,
 	.port_set_egress_floods = mv88e6352_port_set_egress_floods,
@@ -3830,6 +3991,12 @@ static const struct dsa_switch_ops mv88e6xxx_switch_ops = {
 	.get_tag_protocol	= mv88e6xxx_get_tag_protocol,
 	.setup			= mv88e6xxx_setup,
 	.adjust_link		= mv88e6xxx_adjust_link,
+	.phylink_validate	= mv88e6xxx_phylink_validate,
+	.phylink_mac_link_state	= mv88e6xxx_phylink_mac_link_state,
+	.phylink_mac_config	= mv88e6xxx_phylink_mac_config,
+	.phylink_mac_an_restart	= mv88e6xxx_phylink_mac_an_restart,
+	.phylink_mac_link_down	= mv88e6xxx_phylink_mac_link_down,
+	.phylink_mac_link_up	= mv88e6xxx_phylink_mac_link_up,
 	.get_strings		= mv88e6xxx_get_strings,
 	.get_ethtool_stats	= mv88e6xxx_get_ethtool_stats,
 	.get_sset_count		= mv88e6xxx_get_sset_count,
