@@ -270,24 +270,20 @@
 					port@3 {
 						reg = <3>;
 						label = "optical3";
-
+						sfp = <&sff3>;
 						fixed-link {
 							speed = <1000>;
 							full-duplex;
-							link-gpios = <&gpio6 2
-							      GPIO_ACTIVE_HIGH>;
 						};
 					};
 
 					port@4 {
 						reg = <4>;
 						label = "optical4";
-
+						sfp = <&sff4>;
 						fixed-link {
 							speed = <1000>;
 							full-duplex;
-							link-gpios = <&gpio6 3
-							      GPIO_ACTIVE_HIGH>;
 						};
 					};
 
@@ -346,6 +342,26 @@
 			spi-cs-high;
 			data-size = <16>;
 			select-gpios = <&gpio4 4 GPIO_ACTIVE_HIGH>;
+		};
+	};
+
+	sff3: sff3 {
+		compatible = "sff,sff";
+		i2c-bus = <&i2c2_mux3>;
+		los-gpios = <&gpio6 2 GPIO_ACTIVE_HIGH>;
+		fixed-link {
+			speed = <1000>;
+			full-duplex;
+		};
+	};
+
+	sff4: sff4 {
+		compatible = "sff,sff";
+		i2c-bus = <&i2c2_mux2>;
+		los-gpios = <&gpio6 3 GPIO_ACTIVE_HIGH>;
+		fixed-link {
+			speed = <1000>;
+			full-duplex;
 		};
 	};
 };
@@ -413,26 +429,16 @@
 			};
 		};
 
-		i2c@2 {
+		i2c2_mux2: i2c@2 {
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <2>;
-
-			sfp3: at24c04@50 {
-				compatible = "atmel,24c02";
-				reg = <0x50>;
-			};
 		};
 
-		i2c@3 {
+		i2c2_mux3: i2c@3 {
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <3>;
-
-			sfp4: at24c04@50 {
-				compatible = "atmel,24c02";
-				reg = <0x50>;
-			};
 		};
 
 		i2c@4 {
