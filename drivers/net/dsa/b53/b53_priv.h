@@ -105,6 +105,7 @@ struct b53_device {
 	/* connect specific data */
 	u8 current_page;
 	struct device *dev;
+	u8 serdes_lane;
 
 	/* Master MDIO bus we got probed from */
 	struct mii_bus *bus;
@@ -195,8 +196,14 @@ int b53_switch_detect(struct b53_device *dev);
 
 int b53_switch_register(struct b53_device *dev);
 
+int b53_serdes_init(struct b53_device *dev);
+
+void b53_serdes_exit(struct b53_device *dev);
+
 static inline void b53_switch_remove(struct b53_device *dev)
 {
+	if (dev->chip_id == BCM58XX_DEVICE_ID)
+		b53_serdes_exit(dev);
 	dsa_unregister_switch(dev->ds);
 }
 

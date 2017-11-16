@@ -665,6 +665,7 @@ static void b53_switch_reset_gpio(struct b53_device *dev)
 	mdelay(20);
 
 	dev->current_page = 0xff;
+	dev->serdes_lane = 0xff;
 }
 
 static int b53_switch_reset(struct b53_device *dev)
@@ -1973,7 +1974,10 @@ static int b53_switch_init(struct b53_device *dev)
 			return ret;
 	}
 
-	return 0;
+	if (dev->chip_id == BCM58XX_DEVICE_ID)
+		ret = b53_serdes_init(dev);
+
+	return ret;
 }
 
 struct b53_device *b53_switch_alloc(struct device *base,
